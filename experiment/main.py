@@ -1,5 +1,5 @@
 """
-PYTHONPATH=/opt/ros/indigo/lib/python2.7/dist-packages;
+PYTHONPATH=/opt/ros/indigo/lib/python2.7/dist-packages:/opt/ros/indigo/lib/;
 PYTHONUNBUFFERED=1;
 LD_LIBRARY_PATH=/usr/local/cuda/lib64:/usr/local/cuda/extras/CUPTI/lib64
 CUDA_VISIBLE_DEVICES = 0
@@ -11,7 +11,7 @@ import _init_paths
 from dataset.dataset import init_dataset
 from network.model import init_network
 from apoxel.apoxel import start_process
-
+from tools.printer import red,blue,yellow
 def parse_args():
     parser = argparse.ArgumentParser(description='Train a ApoxelNet network')
     parser.add_argument('--gpu_id', dest='gpu_id',help=' which gpu to use',
@@ -21,17 +21,17 @@ def parse_args():
     parser.add_argument('--weights', dest='weights',help='which network weights',
                         default=None, type=str)
     parser.add_argument('--epoch_iters', dest='epoch_iters',help='number of iterations to train',
-                        default=100, type=int)
+                        default=600, type=int)
     parser.add_argument('--imdb_type', dest='imdb_type',help='dataset to train on(sti/kitti)', choices=['kitti', 'sti'],
                         default='sti', type=str)
 
     parser.add_argument('--useDemo', dest='useDemo',help='whether use continues frame demo',
                         default="False", type=str)
     parser.add_argument('--fineTune', dest='fineTune',help='whether finetune the existing network weight',
-                        default='True', type=str)
+                        default='False', type=str)
 
     parser.add_argument('--use_demo', dest='use_demo', default=False, type=bool)
-    parser.add_argument('--fine_tune', dest='fine_tune', default=True, type=bool)
+    parser.add_argument('--fine_tune', dest='fine_tune', default=False, type=bool)
 
     # if len(sys.argv) == 1:
     #   parser.print_help()
@@ -43,7 +43,7 @@ def checkArgs(Args):
 
     # print('Using config:')
     # pprint.pprint(cfg)
-    print "Checking the args ..."
+    print yellow("Checking the args ...")
 
     if Args.fineTune == 'True':
         Args.fine_tune = True
@@ -57,18 +57,18 @@ def checkArgs(Args):
 
     if Args.method == 'test':
         if Args.weights is None:
-            print "  Specify the testing network weights!"
+            print red("  Specify the testing network weights!")
             sys.exit(3)
         else:
-            print "  Test the weight: \n {}".format(Args.weights)
+            print blue("  Test the weight: \n {}".format(Args.weights))
     elif Args.fine_tune:
             if Args.weights is None:
-                print "  Specify the finetune network weights!"
+                print red("  Specify the finetune network weights!")
                 sys.exit(4)
             else:
-                print "  Finetune the weight:  {}".format(Args.weights)
+                print blue("  Finetune the weight:  {}".format(Args.weights))
     else:
-            print "  The network will RE-TRAIN from empty ! ! "
+            print red("  The network will RE-TRAIN from empty ! ! ")
     print '  Called with args:',args
 
 

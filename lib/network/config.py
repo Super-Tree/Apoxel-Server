@@ -9,7 +9,7 @@ __C = edict()
 
 cfg = __C
 __C.ROOT_DIR = osp.abspath(osp.join(osp.dirname(__file__), '..', '..'))
-__C.DATA_DIR = osp.abspath(osp.join(__C.ROOT_DIR, 'data_sti32'))
+__C.DATA_DIR = osp.abspath(osp.join(__C.ROOT_DIR, 'RSdata32b'))
 __C.RANDOM_STR =''.join(random.sample(string.uppercase, 4))
 __C.OUTPUT_DIR = osp.abspath(osp.join(__C.ROOT_DIR, 'output'))
 __C.LOG_DIR = osp.abspath(osp.join(__C.ROOT_DIR, 'log'))
@@ -27,12 +27,13 @@ __C.CUBIC_SIZE = [int(np.ceil(np.round(__C.ANCHOR[i] / __C.CUBIC_RES[i], 3))) fo
 
 __C.TRAIN = edict()
 
-__C.TRAIN.ITER_DISPLAY=1
+__C.TRAIN.LEARNING_RATE = 1e-4
+
+__C.TRAIN.ITER_DISPLAY=10
 __C.TRAIN.TENSORBOARD=True
 __C.TRAIN.DEBUG_TIMELINE=True
 __C.TRAIN.EPOCH_MODEL_SAVE=True
-__C.TRAIN.USE_VALID = False
+__C.TRAIN.USE_VALID = True
 __C.TRAIN.FOCAL_LOSS = True
+__C.TRAIN.VISUAL_VALID=True
 
-
-__C.TRAIN.LEARNING_RATE = 1e-4

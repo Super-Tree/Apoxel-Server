@@ -7,7 +7,8 @@ class VFELayer(object):
     def __init__(self, out_channels, name):
         super(VFELayer, self).__init__()
         self.units = int(out_channels / 2)
-        with tf.variable_scope(name, reuse=tf.AUTO_REUSE) as scope:
+        self.name = name
+        with tf.variable_scope(self.name, reuse=tf.AUTO_REUSE) as scope:
             self.dense = tf.layers.Dense(
                 self.units, tf.nn.relu, name='dense', _reuse=tf.AUTO_REUSE, _scope=scope)
             self.batch_norm = tf.layers.BatchNormalization(
@@ -16,19 +17,20 @@ class VFELayer(object):
     def apply(self, inputs, mask, training):
         # [K, T, 6] tensordot [6, units] = [K, T, units]
         pointwise = self.batch_norm.apply(self.dense.apply(inputs), training)
-        # TODO:to be rewrite,and this method is not effective for using all of the point including poings that is not existing
-        # [K, 1, units]
-        aggregated = tf.reduce_max(pointwise, axis=1, keep_dims=True)
+        with tf.variable_scope(self.name):
+            # TODO:to be rewrite,and this method is not effective for using all of the point including poings that is not existing
+            # [K, 1, units]
+            aggregated = tf.reduce_max(pointwise, axis=1, keep_dims=True)
 
-        # [K, T, units]
-        repeated = tf.tile(aggregated, [1, cfg.VOXEL_POINT_COUNT, 1])
+            # [K, T, units]
+            repeated = tf.tile(aggregated, [1, cfg.VOXEL_POINT_COUNT, 1],name="tile_A0")
 
-        # [K, T, 2 * units]
-        concatenated = tf.concat([pointwise, repeated], axis=2)
+            # [K, T, 2 * units]
+            concatenated = tf.concat([pointwise, repeated], axis=2)
 
-        mask = tf.tile(mask, [1, 1, 2 * self.units])
+            mask = tf.tile(mask, [1, 1, 2 * self.units],name="tile_A1")
 
-        concatenated = tf.multiply(concatenated, tf.cast(mask, tf.float32))
+            concatenated = tf.multiply(concatenated, tf.cast(mask, tf.float32))
 
         return concatenated
 

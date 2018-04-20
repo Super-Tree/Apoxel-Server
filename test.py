@@ -1,9 +1,7 @@
-import tensorflow as tf
-
-indices = tf.constant([[4,1], [1,5], [1,1], [3,2]])
-updates = tf.constant([[4,1], [4,3], [3,1], [4,5]])
-shape = tf.constant([6,6,2])
-
-scatter = tf.scatter_nd(indices, updates, shape)
-with tf.Session() as sess:
-    print(sess.run(scatter))
+print 'fdasdasdas'
+print 'adadadwqee12'
+print 'adadade123231'
+print "\r\e[K"
+print 'adadadwqee12'
+print "\r\033[K adqwe \033[1m"
+print 'adadade123231'

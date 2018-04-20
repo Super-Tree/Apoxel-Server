@@ -11,7 +11,7 @@ class TrainNet(Net):
         # [N, 4]
         self.pc_input = tf.placeholder(tf.float32, shape=[None, 4])
         # [ΣK, 200, 6]
-        self.feature = tf.placeholder(
+        self.voxel_feature = tf.placeholder(
             tf.float32, [None, cfg.VOXEL_POINT_COUNT, 6], name='feature')
         # [ΣK, 3], each row stores (batch, d, w)
         self.coordinate = tf.placeholder(tf.int64, [None, 2], name='coordinate')
@@ -23,9 +23,9 @@ class TrainNet(Net):
         self.vfe_feature = self.vfe_encoder(vfe_size=(32, 128, 32), name="VFE-Encoder", training=True)
         self.predicted_map = self.apollo_net(self.vfe_feature)
 
-    def apollo_net(self, feature):
+    def apollo_net(self, vfe_map_feature):
         with tf.variable_scope('conv-block0') as scope:
-            conv0_1 = self.conv2d_relu(feature, num_kernels=24, kernel_size=(1, 1), stride=[1, 1, 1, 1],
+            conv0_1 = self.conv2d_relu(vfe_map_feature, num_kernels=24, kernel_size=(1, 1), stride=[1, 1, 1, 1],
                                        padding='VALID', name='conv0_1')
             conv0 = self.conv2d_relu(conv0_1, num_kernels=24, kernel_size=(3, 3), stride=[1, 1, 1, 1],
                                      padding='SAME', name='conv0')
@@ -124,7 +124,7 @@ class TrainNet(Net):
 
         with tf.variable_scope('deconv-block0') as scope:
             out_size = 2
-            deconv0_shape0 = tf.shape(feature)
+            deconv0_shape0 = tf.shape(vfe_map_feature)
             deconv0_shape = tf.stack([deconv0_shape0[0], deconv0_shape0[1], deconv0_shape0[2], out_size])
             W_t0 = self.weight_variable([4, 4, out_size, 48], name="W_t0")
             b_t0 = self.bias_variable([out_size], name="b_t0")
@@ -147,18 +147,19 @@ class TrainNet(Net):
             with tf.variable_scope('VFE-Bn', reuse=tf.AUTO_REUSE) as scope:
                 batch_norm = tf.layers.BatchNormalization(name='VFE-BN', fused=True, _reuse=tf.AUTO_REUSE, _scope=scope)
 
-        # boolean mask [K, T, 2 * units]
-        mask = tf.not_equal(tf.reduce_max(self.feature, axis=2, keep_dims=True), 0)
-        x = vfe1.apply(self.feature, mask, training)
-        x = vfe2.apply(x, mask, training)
-        x = dense.apply(x)
-        x = batch_norm.apply(x, training)
+            # boolean mask [K, T, 2 * units]
+            mask = tf.not_equal(tf.reduce_max(self.voxel_feature, axis=2, keep_dims=True), 0)
+            x = vfe1.apply(self.voxel_feature, mask, training)
+            x = vfe2.apply(x, mask, training)
+            x = dense.apply(x)
+            x = batch_norm.apply(x, training)
 
-        # [ΣK, 128]
-        voxelwise = tf.reduce_max(x, axis=1)
-        outputs = tf.scatter_nd(self.coordinate, voxelwise, [cfg.CUBIC_SIZE[0], cfg.CUBIC_SIZE[0], vfe_size[2]])
-        outputs = tf.reshape(outputs,(-1,cfg.CUBIC_SIZE[0], cfg.CUBIC_SIZE[0], vfe_size[2]))
-        return outputs
+            # [ΣK, 128]
+            voxelwise = tf.reduce_max(x, axis=1)
+            outputs = tf.scatter_nd(self.coordinate, voxelwise, [cfg.CUBIC_SIZE[0], cfg.CUBIC_SIZE[0], vfe_size[2]],name="ScatterFeature")
+            outputs = tf.reshape(outputs,(-1,cfg.CUBIC_SIZE[0], cfg.CUBIC_SIZE[0], vfe_size[2]))
+
+            return outputs
 
 
 class TestNet(object):
