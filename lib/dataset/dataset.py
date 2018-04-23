@@ -1,36 +1,38 @@
-import cv2
 import re
 import os
 import time
 import random
-
+import cv2
+import sys
+sys.path.insert(0, "/home/hexindong/he/Apoxel-Server/lib")
 import cPickle
 import numpy as np
+from tools.printer import red,blue,yellow,darkcyan,blue,green
 from tools.timer import Timer
 from network.config import cfg
 from os.path import join as path_add
 from tools.py_pcd import point_cloud as pcd2np
 from point2grid import voxel_grid
+from numpy import random as np_random
 
 class DataSetTrain(object):  # read txt files one by one
     def __init__(self):
         self.data_path = cfg.DATA_DIR
-        # self.folder_list = ['170818-1743-LM120', '170825-1708-LM120', '170829-1743-LM120', '170829-1744-LM120',
-        #                     '1180254121101']
-        self.folder_list = ['32_gaosulu_test']
-        self._classes = ['unknown', 'smallMot', 'bigMot', 'nonMot', 'pedestrian']
+        # self.folder_list = ['32beams_dingdianlukou_2018-03-12-11-02-41']
+        self.folder_list = ['32_yuanqu_11804041320','p3_beihuan_B16_11803221546','32beams_dingdianlukou_2018-03-12-11-02-41', '32_daxuecheng_01803191740', '32_gaosulu_test','xuanchuan']
+        self._classes = ['unknown', 'smallMot', 'bigMot', 'nonMot', 'pedestrian']#TODO:declare: there is another label dont care! becareful
         self.type_to_keep = ['smallMot', 'bigMot', 'nonMot', 'pedestrian']
         self.num_classes = len(self._classes)
         self.class_convert = dict(zip(self._classes, xrange(self.num_classes)))
         self.total_roidb = []
         self.filter_roidb = []
-        self.percent_train = 0.66
-        self.percent_valid = 0.26
+        self.percent_train = 0.7
+        self.percent_valid = 0.3
         self.train_set, self.valid_set, self.test_set = self.load_dataset()
         self.validing_rois_length = len(self.valid_set)
         self.training_rois_length = len(self.train_set)
-        print 'Dataset initialization has been done successfully.'
-        time.sleep(1)
+        print blue('Dataset initialization has been done successfully.')
+        time.sleep(2)
 
     def load_dataset(self):
         Instruction_cache_file = path_add(self.data_path, 'Instruction_cache_data.pkl')
@@ -39,11 +41,11 @@ class DataSetTrain(object):  # read txt files one by one
         test_cache_file = path_add(self.data_path, 'test_cache_data.pkl')
         if os.path.exists(train_cache_file) & os.path.exists(valid_cache_file) & os.path.exists(
                 test_cache_file) & os.path.exists(Instruction_cache_file):
-            print 'Loaded the STi dataset from pkl cache files ...'
+            print blue('Loaded the STi dataset from pkl cache files ...')
             with open(Instruction_cache_file, 'rb') as fid:
                 key_points = cPickle.load(fid)
-                print ' \033[31;1m NOTICE: the groundtruth range is [{}] meters, the label to keep is {} ,please verify that meets requirement ! \033[0m' \
-                    .format(key_points[0], key_points[1], )
+                print yellow('  NOTICE: the groundtruth range is [{}] meters, the label to keep is {},\n          including folders:{},\n  Please verify that meets requirement !' \
+                    .format(key_points[0], key_points[1], key_points[2]))
             with open(train_cache_file, 'rb') as fid:
                 train_set = cPickle.load(fid)
                 print '  train gt set(cnt:{}) loaded from {}'.format(len(train_set), train_cache_file)
@@ -56,18 +58,16 @@ class DataSetTrain(object):  # read txt files one by one
                 test_set = cPickle.load(fid)
                 print '  test gt set(cnt:{}) loaded from {}'.format(len(test_set), test_cache_file)
 
-
             return train_set, valid_set, test_set
 
-        print 'Prepare the STi dataset for training, please wait ...'
+        print blue('Prepare the STi dataset for training, please wait ...')
         self.total_roidb = self.load_sti_annotation()
         self.filter_roidb = self.filter(self.total_roidb, self.type_to_keep)
         train_set, valid_set, test_set = self.assign_dataset(self.filter_roidb)  # train,valid percent
         with open(Instruction_cache_file, 'wb') as fid:
-            cPickle.dump([cfg.DETECTION_RANGE, self.type_to_keep], fid, cPickle.HIGHEST_PROTOCOL)
-            print '  NOTICE: the groundtruth range is [{}] meters, the label to keep is {} ,please verify that meets requirement !' \
-                .format(self.type_to_keep[0], self.type_to_keep[1], )
-
+            cPickle.dump([cfg.DETECTION_RANGE, self.type_to_keep,self.folder_list], fid, cPickle.HIGHEST_PROTOCOL)
+            print yellow('  NOTICE: the groundtruth range is [{}] meters, the label to keep is {},\n          use the dataset:{},\n  Please verify that meets requirement !' \
+                .format(cfg.DETECTION_RANGE, self.type_to_keep, self.folder_list))
         with open(train_cache_file, 'wb') as fid:
             cPickle.dump(train_set, fid, cPickle.HIGHEST_PROTOCOL)
             print '  Wrote and loaded train gt roidb(cnt:{}) to {}'.format(len(train_set), train_cache_file)
@@ -81,44 +81,60 @@ class DataSetTrain(object):  # read txt files one by one
         return train_set, valid_set, test_set
 
     def load_sti_annotation(self):
-        total_box_labels, total_fnames, total_category_labels, total_confidence_labels = [], [], [], []
+        total_box_labels, total_fnames, total_object_labels, total_confidence_labels = [], [], [], []
         for index, folder in enumerate(self.folder_list):
-            libel_fname = path_add(self.data_path, folder, 'shrink_box_label_bk', 'result.txt')
+            print(green('  Prcess the folder {}'.format(folder)))
+            #TODO:declaration: the result.txt file in shrink_box_label_bk contains illegal number like: "x":"-1.#IND00","y":"-1.#IND00","z":"-1.#IND00"
+            libel_fname = path_add(self.data_path, folder, 'label', 'result.txt')
             pixel_libel_folder = path_add(self.data_path, folder, 'label_rect')
-            box_label, files_names, one_category_label, one_confidence_label = [], [], [], []
+            box_label, files_names, one_object_label, one_no_ground_label = [], [], [], []
             with open(libel_fname, 'r') as f:
                 frames = f.readlines()
-            for one_frame in frames:  # one frame in a series data
-                one_frame = one_frame.replace('unknown', '0.0').replace('smallMot', '1.0').replace('bigMot',
-                                                                                                   '2.0').replace(
-                    'nonMot', '3.0').replace('pedestrian', '4.0')
+            for idx__,one_frame in enumerate(frames):  # one frame in a series data
+                one_frame = one_frame.replace('unknown', '0.0').replace('smallMot', '1.0').replace('bigMot', '2.0') \
+                    .replace('nonMot', '3.0').replace('pedestrian', '4.0').replace('dontcare', '0.0')
                 object_str = one_frame.translate(None, '\"').split('position:{')[1:]
                 label_in_frame = []
+                if idx__ % 150 == 0:
+                    print ("    Process is going on {}/{} ".format(idx__,len(frames)))
                 for obj in object_str:
                     f_str_num = re.findall('[-+]?\d+\.\d+', obj)
                     f_num = map(float, f_str_num)
                     if len(f_num) == 11:  # filter the  wrong type label like   type: position
                         label_in_frame.append(f_num)
+                    else:  # toxic label ! shit!
+                        print(red('    There is a illegal lbael(length:{}) in result.txt in frame-{} without anything in folder {} and it has been dropped'.format(len(f_num),
+                                idx__, folder)))
+                        print f_num
+                        # print one_frame
+
                 label_in_frame_np = np.array(label_in_frame, dtype=np.float32).reshape(-1, 11)
                 if label_in_frame_np.shape[0] == 0:
+                    print(red('    There is a empty frame-{} without anything in folder {} and it has been dropped'.format(idx__,folder)))
+                    continue
+                if len(np.where(label_in_frame_np[:,9]!= 0)[0])==0:
+                    print(red('    There is a frame-{} without any object in folder {} and it has been dropped'.format(idx__,folder)))
                     continue
                 box_label.append(label_in_frame_np[:, (0, 1, 2, 6, 7, 8, 3, 9)])  # extract the valuable data:x,y,z,l,w,h,theta,type
                 files_names.append(self.get_fname_from_label(one_frame))
-
+            print ("    Loading .npy labels ... ")
             for file_ in sorted(os.listdir(pixel_libel_folder), key=lambda name: int(name[0:-4])):
                 data_matrix = np.load(path_add(pixel_libel_folder, file_))
-                one_category_label.append(data_matrix[:, :, 0:1])  # TODO:check
-                one_confidence_label.append(data_matrix[:, :, 6:7])
-
-            assert len(one_category_label) == len(files_names), "There happens a ERROR when generating dataset in dataset.py"
+                one_object_label.append(data_matrix[:, :, 0:1])  # TODO:check
+                # one_no_ground_label.append(data_matrix[:, :, 6:7])
+            print ("  Completing loading {} is done!  ".format(folder))
+            assert len(one_object_label) == len(files_names), "There happens a ERROR when generating dataset in dataset.py"
             total_box_labels.extend(box_label)
             total_fnames.extend(files_names)
-            total_category_labels.extend(one_category_label)
-            total_confidence_labels.extend(one_confidence_label)
+            total_object_labels.extend(one_object_label)
+            # total_confidence_labels.extend(one_no_ground_label)
+        print("  Zip data in one dict ... ")
         return_dataset = [dict({'files_name': total_fnames[i],
                                 'boxes_labels': total_box_labels[i],
-                                'category_labels': total_category_labels[i],
-                                'confidence_labels': total_confidence_labels[i]})
+                                'object_labels': total_object_labels[i],
+                                # 'confidence_labels': total_confidence_labels[i]
+                                }
+                               )
                           for i in range(len(total_fnames))]
         print("  Total number of frames is {}".format(len(total_fnames)))
         return return_dataset
@@ -176,12 +192,27 @@ class DataSetTrain(object):  # read txt files one by one
         filter_data = [data[k] for k in keep_indice]
 
         num_after = len(filter_data)
-        print 'Filtered {} roidb entries: {} -> {}'.format(num - num_after, num, num_after)
+        print '  Filtered {} roidb entries: {} -> {}'.format(num - num_after, num, num_after)
         return filter_data
 
     def augmentation_of_data(self):
         # Rotation of the image or change the scale
         pass
+
+    def rotation(self, points, rotation):
+        # points: numpy array;  translation: moving scalar which should be small
+        assert len(points.shape) == 2, "dataset.py->DataSetTrain.rotation: input data has illegal shape {} ".format(points.shape)
+        if points.shape[1] >= 3:
+            R = np.array([[np.cos(rotation), -np.sin(rotation), 0.],
+                          [np.sin(rotation), np.cos(rotation), 0.],
+                          [0, 0, 1]], dtype=np.float32)
+            points_rot = np.matmul(R, points[:, 0:3].transpose())#TODO:declaration: discard intensity
+            return points_rot.transpose()
+        elif points.shape[1] == 2:
+            R = np.array([[np.cos(rotation), -np.sin(rotation)],
+                          [np.sin(rotation), np.cos(rotation)],], dtype=np.float32)
+            label_rot = np.matmul(R, points[:, 0:2].transpose())
+            return label_rot.transpose()
 
     def get_minibatch(self, _idx=0, name='train'):
         """Given a roidb, construct a minibatch sampled from it."""
@@ -193,49 +224,140 @@ class DataSetTrain(object):  # read txt files one by one
             index_dataset = self.test_set
 
         fname = index_dataset[_idx]['files_name']
-        timer = Timer()
+        # print 'load this file: ',fname
+        #TODO:action:puts data in pkl files to accelerate the training process
+        # data_pkl_cache = os.path.join(cfg.DATA_DIR,fname.split('/')[0],'data_pkl',fname.split('/')[1][:-4]+'.pkl')
+        # if os.path.exists(data_pkl_cache):
+        #     with open(data_pkl_cache, 'rb') as fid:
+        #         blob = cPickle.load(fid)
+        #         print '  load data_pkl to {}'.format(data_pkl_cache)
 
+        timer = Timer()
         timer.tic()
         lidar_data = pcd2np.from_path(path_add(self.data_path, fname.split('/')[0], 'pcd', fname.split('/')[1]))
+        angel = (np_random.rand() - 0.500) * np.pi * 0.95
+        points_rot = self.rotation(lidar_data.pc_data, angel)
+        boxes_rot = np.add(index_dataset[_idx]['boxes_labels'],[0.,0.,0.,0.,0.,0.,angel,0.])  # yaw
+        category_rot = self.label_rotation(index_dataset[_idx]['object_labels'], degree=angel*57.29578)
         timer.toc()
         time1 = timer.average_time
 
         timer.tic()
-        grid_voxel = voxel_grid(lidar_data.pc_data[:,0:3],cfg,thread_sum=cfg.CPU_CNT)
+        grid_voxel = voxel_grid(points_rot, cfg, thread_sum=cfg.CPU_CNT)
         timer.toc()
         time2 = timer.average_time
+        blob = dict({'serial_num': fname,
+                     'lidar3d_data': np.hstack((points_rot,lidar_data.pc_data[:,3:4])),
 
-        blob = dict({'lidar3d_data': lidar_data.pc_data,
-                     'serial_num': fname,
-                     'boxes_labels': index_dataset[_idx]['boxes_labels'],
-                     'category_labels': index_dataset[_idx]['category_labels'],
-                     'confidence_labels': index_dataset[_idx]['confidence_labels'],
-
+                     'boxes_labels': boxes_rot,
+                     'object_labels': category_rot,
+                     # 'confidence_labels': index_dataset[_idx]['confidence_labels'],
                      'grid_stack': grid_voxel['feature_buffer'],
                      'coord_stack': grid_voxel['coordinate_buffer'],
                      'ptsnum_stack': grid_voxel['number_buffer'],
-
-                     'voxel_gen_time':(time1,time2)
+                     'voxel_gen_time': (time1, time2)
                      })
 
         return blob
 
+    def label_rotation(self,labels,degree):
+
+        shape_ = labels.shape
+        labels = labels.reshape([cfg.CUBIC_SIZE[0],cfg.CUBIC_SIZE[1]])
+        # indice_ctr = np.subtract(np.array(np.where(labels[:,:]==1.0),dtype=np.float32).transpose(),np.array([cfg.CUBIC_SIZE[0]/2,cfg.CUBIC_SIZE[1]/2,]))
+        # rot_indice = np.around(self.rotation(indice_ctr,theta)).astype(int)
+        # indice_min = np.add(rot_indice,np.array([cfg.CUBIC_SIZE[0]/2,cfg.CUBIC_SIZE[1]/2,]))
+        # keep_indice= np.logical_and(np.logical_and(indice_min[:,0]<cfg.CUBIC_SIZE[0],indice_min[:,0]>=0),np.logical_and(indice_min[:,1]>=0,indice_min[:,1]<cfg.CUBIC_SIZE[1]))
+        # fliter = np.where(keep_indice)[0]
+        # filter_indice = indice_min[fliter]
+        # return_res = np.zeros([cfg.CUBIC_SIZE[0],cfg.CUBIC_SIZE[1]],np.float32)
+        # return_res[filter_indice[:,0],filter_indice[:,1]]=1.0
+        matRotation = cv2.getRotationMatrix2D((cfg.CUBIC_SIZE[0] / 2, cfg.CUBIC_SIZE[1] / 2), degree, 1.0)
+        label_rot = cv2.warpAffine(labels, matRotation, (cfg.CUBIC_SIZE[0],cfg.CUBIC_SIZE[1]), borderValue=0)
+
+        return label_rot.reshape(shape_)
+
     @staticmethod
     def get_fname_from_label(strings):
-        # "32_gaosulu_test/32_gaosulu_test_1.pcd"
-        regulars = ['files/32_gaosulu_test/32_gaosulu_test_\d+.pcd']#TODO:add more regular
+        """
+        files/32beams_dingdianlukou_2018-03-12-11-02-41/32beams_dingdianlukou_2018-03-12-11-02-41_0.pcd
+        files/32_daxuecheng_01803191740/32_daxuecheng_01803191740_1.pcd
+        files/32_gaosulu_test/32_gaosulu_test_1.pcd
+        files/xuanchuan/xuanchuan_200.pcd
+        :param strings:
+        :return:
+        """
+
+        regulars = ['files/32_gaosulu_test/32_gaosulu_test_\d+.pcd',
+                    'files/32_daxuecheng_01803191740/32_daxuecheng_01803191740_\d+.pcd',
+                    'files/32beams_dingdianlukou_2018-03-12-11-02-41/32beams_dingdianlukou_2018-03-12-11-02-41_\d+.pcd',
+                    'files/xuanchuan/xuanchuan_\d+.pcd',
+                    'files/p3_beihuan_B16_11803221546/p3_beihuan_B16_11803221546_\d+.pcd',
+                    'files/32_yuanqu_11804041320/32_yuanqu_11804041320_\d+.pcd',
+                    ]  # TODO:add more regular
         for i in range(len(regulars)):
             res = re.findall(regulars[i], strings)
             if len(res) != 0:
                 if len(res) == 1:
                     return res[0][6:]
                 else:
-                    print'File: dataset_sti,function:get_fname_from_label \n  regular expression get more than one qualified file name'
-                    exit(23)
+                    print red('File->dataset_sti,function->get_fname_from_label \n  regular expression get more than one qualified file name,string:{}'.format(strings))
+                    exit(22)
+            else:
+                print red('File->dataset_sti,function->get_fname_from_label: There is no illegal file name in string: {}'.format(strings))
+                exit(23)
 
 class DataSetTest(object):  # read txt files one by one
     def __init__(self):
         self.data_path = cfg.DATA_DIR
+        self.folder = 'demo_test_gaosulu'
+        self.test_set = self.load_dataset()
+        self.testing_rois_length = len(self.test_set)
+        print blue('Dataset initialization has been done successfully.')
+        time.sleep(2)
+
+    def load_dataset(self):
+        f_names = sorted(os.listdir(os.path.join(cfg.DATA_DIR,self.folder,'pcd')),key=lambda _name: int(_name[16:-4]))#,
+        name_list = []
+        for file_ in f_names:
+            name_list.append(os.path.join(cfg.DATA_DIR,self.folder,'pcd',file_))
+
+        return name_list
+
+    def get_minibatch(self, _idx=0):
+        """Given a roidb, construct a minibatch sampled from it."""
+        index_dataset = self.test_set
+        fname = index_dataset[_idx]
+        timer = Timer()
+        timer.tic()
+        lidar_data = pcd2np.from_path(fname)
+        angel = 0 #(np_random.rand() - 0.500) * np.pi * 0.9
+        points_rot = self.rotation(lidar_data.pc_data,angel)
+        timer.toc()
+        time1 = timer.average_time
+
+        timer.tic()
+        grid_voxel = voxel_grid(points_rot, cfg, thread_sum=cfg.CPU_CNT)
+        timer.toc()
+        time2 = timer.average_time
+        blob = dict({'serial_num': fname.split('/')[-1],
+                     'lidar3d_data': lidar_data.pc_data,
+
+                     'grid_stack': grid_voxel['feature_buffer'],
+                     'coord_stack': grid_voxel['coordinate_buffer'],
+                     'ptsnum_stack': grid_voxel['number_buffer'],
+                     'voxel_gen_time': (time1, time2)
+                     })
+
+        return blob
+
+    def rotation(self,points, rotation):
+        # points: numpy array;  translation: moving scalar which should be small
+        R = np.array([[np.cos(rotation), -np.sin(rotation), 0.],
+                      [np.sin(rotation), np.cos(rotation), 0.],
+                      [0, 0, 1]], dtype=np.float32)
+        points_rot = np.matmul(R, points[:, 0:3].transpose())
+        return points_rot.transpose()
 
 def init_dataset(arguments):
     """Get an imdb (image database) by name."""
@@ -251,18 +373,28 @@ if __name__ == '__main__':
     from sensor_msgs.msg import PointCloud
     from tools.data_visualize import PointCloud_Gen, Boxes_labels_Gen
 
-    rospy.init_node('node_labels')
-    label_pub = rospy.Publisher('labels', MarkerArray, queue_size=100)
-    point_pub = rospy.Publisher('points', PointCloud, queue_size=100)
-    rospy.loginfo('Ros begin ...')
+    # rospy.init_node('node_labels')
+    # label_pub = rospy.Publisher('labels', MarkerArray, queue_size=100)
+    # point_pub = rospy.Publisher('points', PointCloud, queue_size=100)
+    # rospy.loginfo('Ros begin ...')
+    # while True:
+    #     blobs = dataset.get_minibatch(idx)
+    #     pointcloud = PointCloud_Gen(blobs["lidar3d_data"], frameID='rslidar')
+    #     label_box = Boxes_labels_Gen(blobs["boxes_labels"], ns='test_box')
+    #     label_pub.publish(label_box)
+    #     point_pub.publish(pointcloud)
+    #     rospy.loginfo('Send {} frame'.format(idx))
+    #     idx += 1
 
     dataset = DataSetTrain()
-    idx = 0
-    while True:
+    print(yellow('Convert {} data into pkl file ...').format(dataset.training_rois_length))
+    for idx in range(dataset.training_rois_length):
         blobs = dataset.get_minibatch(idx)
-        pointcloud = PointCloud_Gen(blobs["lidar3d_data"], frameID='rslidar')
-        label_box = Boxes_labels_Gen(blobs["boxes_labels"], ns='test_box')
-        label_pub.publish(label_box)
-        point_pub.publish(pointcloud)
-        rospy.loginfo('Send {} frame'.format(idx))
-        idx += 1
+        name = blobs['serial_num']
+        data_pkl_name = os.path.join(cfg.DATA_DIR,name.split('/')[0],'data_pkl',name.split('/')[1][:-4]+'.pkl')
+        with open(data_pkl_name, 'wb') as fid:
+            cPickle.dump(blobs, fid, cPickle.HIGHEST_PROTOCOL)
+            # print '  Wrote data_pkl to {}'.format(data_pkl_name)
+
+
+
