@@ -39,8 +39,7 @@ class DataSetTrain(object):  # read txt files one by one
         train_cache_file = path_add(self.data_path, 'train_cache_data.pkl')
         valid_cache_file = path_add(self.data_path, 'valid_cache_data.pkl')
         test_cache_file = path_add(self.data_path, 'test_cache_data.pkl')
-        if os.path.exists(train_cache_file) & os.path.exists(valid_cache_file) & os.path.exists(
-                test_cache_file) & os.path.exists(Instruction_cache_file):
+        if os.path.exists(train_cache_file) & os.path.exists(valid_cache_file) & os.path.exists(test_cache_file) & os.path.exists(Instruction_cache_file):
             print blue('Loaded the STi dataset from pkl cache files ...')
             with open(Instruction_cache_file, 'rb') as fid:
                 key_points = cPickle.load(fid)
@@ -303,9 +302,8 @@ class DataSetTrain(object):  # read txt files one by one
                 else:
                     print red('File->dataset_sti,function->get_fname_from_label \n  regular expression get more than one qualified file name,string:{}'.format(strings))
                     exit(22)
-            else:
-                print red('File->dataset_sti,function->get_fname_from_label: There is no illegal file name in string: {}'.format(strings))
-                exit(23)
+        print red('File->dataset_sti,function->get_fname_from_label: There is no illegal file name in string: {}'.format(strings))
+        exit(23)
 
 class DataSetTest(object):  # read txt files one by one
     def __init__(self):
