@@ -13,11 +13,12 @@ class VFELayer(object):
                 self.units, tf.nn.relu, name='dense', _reuse=tf.AUTO_REUSE, _scope=scope)
             self.batch_norm = tf.layers.BatchNormalization(
                 name='batch_norm', fused=True, _reuse=tf.AUTO_REUSE, _scope=scope)
+            self.scope = scope
 
     def apply(self, inputs, mask, training):
         # [K, T, 6] tensordot [6, units] = [K, T, units]
         pointwise = self.batch_norm.apply(self.dense.apply(inputs), training)
-        with tf.variable_scope(self.name):
+        with tf.variable_scope(self.name+'-Mask'):
             # TODO:to be rewrite,and this method is not effective for using all of the point including poings that is not existing
             # [K, 1, units]
             aggregated = tf.reduce_max(pointwise, axis=1, keep_dims=True)

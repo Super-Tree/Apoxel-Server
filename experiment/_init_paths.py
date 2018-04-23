@@ -16,4 +16,3 @@ add_path(lib_path)
 
 # Add ROS  to PYTHONPATH
 add_path("/opt/ros/indigo/lib/python2.7/dist-packages")
-add_path("/opt/ros/indigo/lib")

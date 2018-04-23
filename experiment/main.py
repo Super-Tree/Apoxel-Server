@@ -43,6 +43,7 @@ def checkArgs(Args):
 
     # print('Using config:')
     # pprint.pprint(cfg)
+
     print yellow("Checking the args ...")
 
     if Args.fineTune == 'True':
@@ -75,6 +76,9 @@ def checkArgs(Args):
 if __name__ == '__main__':
     # import numpy as np
     # np.random.seed(5)
+    import os
+    os.environ["CUDA_VISIBLE_DEVICES"] = '1'
+
     args = parse_args()
 
     checkArgs(args)
