@@ -9,19 +9,22 @@ class TrainNet(Net):
         super(TrainNet, self).__init__()
 
         # [N, 4]
-        self.pc_input = tf.placeholder(tf.float32, shape=[None, 4])
+        self.pc_input = tf.placeholder(tf.float32, shape=[None, 4], name='pointcloud')
         # [ΣK, 200, 6]
         self.voxel_feature = tf.placeholder(
-            tf.float32, [None, cfg.VOXEL_POINT_COUNT, 6], name='feature')
+            tf.float32, [None, cfg.VOXEL_POINT_COUNT, 6], name='grid')
         # [ΣK, 3], each row stores (batch, d, w)
         self.coordinate = tf.placeholder(tf.int64, [None, 2], name='coordinate')
         # [ΣK]
         self.number = tf.placeholder(tf.int64, [None], name='number')
 
-        self.gt_map = tf.placeholder(tf.int64, shape=[cfg.CUBIC_SIZE[0],cfg.CUBIC_SIZE[1], 1])
+        self.gt_map = tf.placeholder(tf.int64, shape=[cfg.CUBIC_SIZE[0],cfg.CUBIC_SIZE[1], 1],name='gt_map')
 
         self.vfe_feature = self.vfe_encoder(vfe_size=(32, 128, 32), name="VFE-Encoder", training=True)
         self.predicted_map = self.apollo_net(self.vfe_feature)
+
+        # with tf.variable_scope('OutResult'):
+        #     tf.get_variable()
 
     def apollo_net(self, vfe_map_feature):
         with tf.variable_scope('conv-block0') as scope:
@@ -129,7 +132,6 @@ class TrainNet(Net):
             W_t0 = self.weight_variable([4, 4, out_size, 48], name="W_t0")
             b_t0 = self.bias_variable([out_size], name="b_t0")
             predicted_map = self.conv2d_transpose_strided(conv_deconv4, W_t0, b_t0, output_shape=deconv0_shape)
-
         # v2 = tf.constant(0.5)
         # scores = predict[:, :, :, :2]
         # # sigmoid = tf.nn.sigmoid(scores, name='scores')

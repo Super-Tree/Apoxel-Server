@@ -38,10 +38,10 @@ class TrainProcessor(object):
             if cfg.TRAIN.FOCAL_LOSS:
                 # TODO:add +- balance
                 cross_entropy = -tf.reduce_sum(
-                    tf.multiply(labels * ((1 - scores_softmax) ** 2) * tf.log(scores_softmax + epsilon), 25), axis=[1])
+                    tf.multiply(labels * ((1 - scores_softmax) ** 3) * tf.log(scores_softmax + epsilon), 50), axis=[1])
             else:
                 pass
-                cross_entropy = -tf.reduce_sum(tf.multiply(labels * tf.log(scores_softmax + epsilon), 25), axis=[1])
+                cross_entropy = -tf.reduce_sum(tf.multiply(labels * tf.log(scores_softmax + epsilon), 50), axis=[1])
 
             cross_entropy_mean = tf.reduce_mean(cross_entropy, name='cross_entropy')
             loss = cross_entropy_mean
@@ -115,6 +115,7 @@ class TrainProcessor(object):
                         blobs['voxel_gen_time'][0], blobs['voxel_gen_time'][1])
                 if iter % 20 == 0 and cfg.TRAIN.TENSORBOARD:
                     train_writer.add_summary(merged_, iter)
+                    train_writer.add_run_metadata(run_metadata, 'step%03d' % iter)
                     pass
                 if (iter % 4000 == 0 and cfg.TRAIN.DEBUG_TIMELINE) or (iter == 300):
                     # chrome://tracing
@@ -159,7 +160,7 @@ class TrainProcessor(object):
                             pass
                             print 'Valid step: {:d}/{:d} , theta_loss = {:.3f}'.format(data_idx + 1, self.val_epoch, float(loss_valid_))
 
-                        if data_idx % 100 == 0 and cfg.TRAIN.TENSORBOARD:
+                        if data_idx % 10 == 0 and cfg.TRAIN.TENSORBOARD:
                             pass
                             train_writer.add_summary(valid_sum_, data_idx)
 
