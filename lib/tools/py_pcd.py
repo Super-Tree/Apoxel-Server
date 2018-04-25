@@ -329,7 +329,7 @@ def generate_pcd(path,save_path):
                          'viewpoint': [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0],
                          'width': cnt,
                          })
-        pointcloud = pointcloud(metadata, pc_data)
+        pointcloud = point_cloud(metadata, pc_data)
         pcd_name = os.path.join(save_path, str(idx_).zfill(6) + '.pcd')
         pointcloud.save(pcd_name)
         print 'save file: {}'.format(pcd_name)

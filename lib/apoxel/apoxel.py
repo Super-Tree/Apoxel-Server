@@ -7,7 +7,7 @@ from tensorflow.python.client import timeline
 from tools.data_visualize import pcd_vispy, vispy_init
 
 DEBUG = False
-
+SUFFIX ='M4-E7_yuanqu'
 
 class TrainProcessor(object):
     def __init__(self, network, data_set, args):
@@ -27,6 +27,28 @@ class TrainProcessor(object):
         filename = os.path.join(output_dir, 'Apoxel_Epoch_{:d}'.format(iter) + '.ckpt')
         self.saver.save(sess, filename)
         print 'Wrote snapshot to: {:s}'.format(filename)
+
+    def save_res_as_pcd(self,pointcloud,map,fname):
+        import numpy as np
+        from tools.utils import bounding_trans_lidar2bv
+
+        map = map.reshape(cfg.CUBIC_RES[0], cfg.CUBIC_RES[1])
+        coordinate = np.array(np.where(map!=0),dtype=np.int32).transpose()
+        print 'coordinate shape:{}'.format(coordinate.shape)
+        print coordinate
+
+        pointcloud[:,3]=np.zeros([pointcloud.shape[0]],dtype=np.float32)
+
+        center = np.array([cfg.DETECTION_RANGE, cfg.DETECTION_RANGE, 0], dtype=np.float32)
+        shifted_coord = bounding_trans_lidar2bv(pointcloud[:,0:3], center)
+        voxel_size = np.array(cfg.CUBIC_RES, dtype=np.float32)
+        voxel_index = np.floor(shifted_coord[:, 0:2] / voxel_size).astype(np.int)
+
+        keep = np.where(np.array([True if voxel_index[i] in map else False for i in range(voxel_index.shape[0])],
+                              dtype=np.bool) == True)[0]
+        # pointcloud[map[:,0], map[:,1]] = np.ones([map.shape[0]], dtype=np.float32)
+        pointcloud[keep, 3] = np.ones([keep.shape[0]], dtype=np.float32)
+        print 'Done'
 
     def processor(self, sess, train_writer):
         with tf.name_scope('loss_design'):
@@ -59,11 +81,11 @@ class TrainProcessor(object):
             cnt = tf.shape(self.net.coordinate)[0]
             updates = tf.ones([cnt], dtype=tf.float32)
             input_map = tf.reshape(tf.scatter_nd(self.net.coordinate, updates, shape=[640, 640]), (-1, 640, 640, 1))
-            final_res = input_map*res_map
+            # final_res = input_map*res_map
             tf.summary.image('InputData', input_map)
             tf.summary.image('PredMap', res_map)
             tf.summary.image('GtMap', gt_map)
-            tf.summary.image('FilterResult', final_res)
+            # tf.summary.image('FilterResult', final_res)
             tf.summary.scalar('TrainLoss', loss)
 
             glb_var = tf.trainable_variables()
@@ -99,7 +121,6 @@ class TrainProcessor(object):
                     self.net.coordinate: blobs['coord_stack'],
                     self.net.number: blobs['ptsnum_stack'],
                     self.net.gt_map: blobs['object_labels'],
-
                 }
 
                 run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
@@ -108,6 +129,7 @@ class TrainProcessor(object):
                 res_map_, loss_, merged_, _ = sess.run([res_map, loss, main_merged, train_op], feed_dict=feed_dict,
                                                        options=run_options, run_metadata=run_metadata)
                 timer.toc()
+
                 if iter % cfg.TRAIN.ITER_DISPLAY == 0:
                     print 'Iter: %d/%d, Serial_num: %s, Speed: %.3fs/iter, Loss: %.3f ' % (
                     iter, self.args.epoch_iters * self.epoch, blobs['serial_num'], timer.average_time, loss_)
@@ -115,7 +137,7 @@ class TrainProcessor(object):
                         blobs['voxel_gen_time'][0], blobs['voxel_gen_time'][1])
                 if iter % 20 == 0 and cfg.TRAIN.TENSORBOARD:
                     train_writer.add_summary(merged_, iter)
-                    train_writer.add_run_metadata(run_metadata, 'step%03d' % iter)
+                    # train_writer.add_run_metadata(run_metadata, 'step%03d' % iter,iter)
                     pass
                 if (iter % 4000 == 0 and cfg.TRAIN.DEBUG_TIMELINE) or (iter == 300):
                     # chrome://tracing
@@ -181,6 +203,54 @@ class TestProcessor(object):
         self.random_folder = cfg.RANDOM_STR
         self.epoch = self.dataset.testing_rois_length
 
+    def save_res_as_pcd(self,pointcloud,map,save_path,folder,idx_):
+        import numpy as np
+        from tools.utils import bounding_trans_lidar2bv
+        from tools.py_pcd import point_cloud
+
+        map = map.reshape(cfg.CUBIC_SIZE[0], cfg.CUBIC_SIZE[1])
+        map_coordinate = np.array(np.where(map!=0),dtype=np.int32).transpose()
+        # print 'coordinate shape:{}'.format(coordinate.shape)
+        # print coordinate
+        pointcloud[:,3]=np.zeros([pointcloud.shape[0]],dtype=np.float32)
+
+        center = np.array([cfg.DETECTION_RANGE, cfg.DETECTION_RANGE, 0], dtype=np.float32)
+        shifted_coord = bounding_trans_lidar2bv(pointcloud[:,0:3], center)
+        voxel_size = np.array(cfg.CUBIC_RES, dtype=np.float32)
+        voxel_index = np.floor(shifted_coord[:, 0:2] / voxel_size).astype(np.int)
+
+        keep = np.where(np.array([True if voxel_index[i] in map_coordinate else False for i in range(voxel_index.shape[0])],
+                              dtype=np.bool) == True)[0]
+        # pointcloud[map[:,0], map[:,1]] = np.ones([map.shape[0]], dtype=np.float32)
+        pointcloud[keep, 3] = np.ones([keep.shape[0]], dtype=np.float32)*125
+        pointcloud =pointcloud[keep]
+        cnt = pointcloud.shape[0]
+        metadata = dict({'count': [1, 1, 1, 1],
+                         'data': 'ascii',
+                         'fields': ['x', 'y', 'z', 'intensity'],
+                         'height': 1,
+                         'points': cnt,
+                         'size': [4, 4, 4, 4],
+                         'type': ['F', 'F', 'F', 'F'],
+                         'version': '0.7',
+                         'viewpoint': [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0],
+                         'width': cnt,
+                         })
+
+        pointcloud = point_cloud(metadata, pointcloud)
+        pcd_name = os.path.join(save_path,folder, str(idx_).zfill(6) + '.pcd')
+        pointcloud.save(pcd_name)
+
+        print 'Done,save file to {}'.format(pcd_name)
+
+    def save_pred_as_npy(self,map,save_path,folder,idx_):
+        import numpy as np
+        if not os.path.exists(os.path.join(save_path,folder)):
+            os.mkdir(os.path.join(save_path,folder))
+        npy_name = os.path.join(save_path,folder,str(idx_).zfill(6) + '.npy')
+        np.save(npy_name,map)
+        print 'Done,save file to {}'.format(npy_name)
+
     def processor(self, sess, train_writer):
         with tf.name_scope('test_debug_board'):
             res_map = tf.cast(tf.reshape(tf.argmax(self.net.predicted_map, axis=3), [-1, 640, 640, 1]),dtype=tf.float32)
@@ -203,7 +273,7 @@ class TestProcessor(object):
         for data_idx in training_series:  # DO NOT EDIT the "training_series",for the latter shuffle
             blobs = self.dataset.get_minibatch(data_idx)  # get one batch
             feed_dict = {
-                self.net.pc_input: blobs['lidar3d_data'],
+                # self.net.pc_input: blobs['lidar3d_data'],
                 self.net.voxel_feature: blobs['grid_stack'],
                 self.net.coordinate: blobs['coord_stack'],
                 self.net.number: blobs['ptsnum_stack'],
@@ -212,17 +282,17 @@ class TestProcessor(object):
             run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
             run_metadata = tf.RunMetadata()
             timer.tic()
-            merged_ = sess.run(merged, feed_dict=feed_dict,options=run_options, run_metadata=run_metadata)
+            res_map_,merged_ = sess.run([res_map,merged], feed_dict=feed_dict,options=run_options, run_metadata=run_metadata)
             timer.toc()
-            if data_idx % cfg.TRAIN.ITER_DISPLAY == 0:
-                print 'Iter: %d/%d, Serial_num: %s, Speed: %.3fs/iter' % (
-                data_idx, self.epoch, blobs['serial_num'], timer.average_time)
-                print 'Loading pcd use: {:.3}s, and generating voxel points use: {:.3}s'.format(
-                    blobs['voxel_gen_time'][0], blobs['voxel_gen_time'][1])
+            self.save_pred_as_npy(res_map_, save_path=cfg.TEST_RESULT,folder=SUFFIX,idx_=data_idx)
+
+            if data_idx % cfg.TEST.ITER_DISPLAY == 0:
+                print 'Iter: %d/%d, Serial_num: %s, Speed: %.3fs/iter' % (data_idx, self.epoch, blobs['serial_num'], timer.average_time)
+                print 'Loading pcd use: {:.3}s, and generating voxel points use: {:.3}s'.format(blobs['voxel_gen_time'][0], blobs['voxel_gen_time'][1])
             if data_idx % 1 == 0 and cfg.TRAIN.TENSORBOARD:
                 train_writer.add_summary(merged_, data_idx)
                 pass
-            if (data_idx % 200 == 0 and cfg.TRAIN.DEBUG_TIMELINE) or (data_idx == 20):
+            if (data_idx+1) % 200 == 0 and cfg.TEST.DEBUG_TIMELINE:
                 # chrome://tracing
                 trace = timeline.Timeline(step_stats=run_metadata.step_stats)
                 trace_file = open(cfg.LOG_DIR + '/' + 'testing-step-' + str(data_idx).zfill(7) + '.ctf.json', 'w')
@@ -235,11 +305,17 @@ class TestProcessor(object):
 def start_process(network, data_set, args):
     if args.method == 'train':
         net = TrainProcessor(network, data_set, args)
+        suffix = None
     else:
         net = TestProcessor(network, data_set, args)
+        suffix = SUFFIX
 
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
     with tf.Session(config=config) as sess:
-        train_writer = tf.summary.FileWriter(cfg.LOG_DIR, sess.graph, max_queue=300)
+        train_writer = tf.summary.FileWriter(cfg.LOG_DIR, sess.graph, max_queue=300,filename_suffix=suffix)
         net.processor(sess, train_writer)
+
+
+if __name__ =='__main__':
+    pass

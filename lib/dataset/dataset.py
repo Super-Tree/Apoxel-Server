@@ -305,17 +305,43 @@ class DataSetTrain(object):  # read txt files one by one
         print red('File->dataset_sti,function->get_fname_from_label: There is no illegal file name in string: {}'.format(strings))
         exit(23)
 
+    def check_name_get_data(self,pcd_path):
+        lidar_data = pcd2np.from_path(pcd_path)
+        angel = 0  # (np_random.rand() - 0.500) * np.pi * 0.95
+        points_rot = self.rotation(lidar_data.pc_data, angel)
+
+        grid_voxel = voxel_grid(points_rot, cfg, thread_sum=cfg.CPU_CNT)
+        blob = dict({'lidar3d_data': np.hstack((points_rot, lidar_data.pc_data[:, 3:4])),
+                     'grid_stack': grid_voxel['feature_buffer'],
+                     'coord_stack': grid_voxel['coordinate_buffer'],
+                     'ptsnum_stack': grid_voxel['number_buffer'],
+                     })
+
+        return blob
+
+
 class DataSetTest(object):  # read txt files one by one
     def __init__(self):
         self.data_path = cfg.DATA_DIR
-        self.folder = 'demo_test_gaosulu'
+        self.folder = 'demo_test_yuanqu'
         self.test_set = self.load_dataset()
         self.testing_rois_length = len(self.test_set)
         print blue('Dataset initialization has been done successfully.')
         time.sleep(2)
 
+    def extract_name(self, file_name):
+        """32_gaosulu_test_1.pcd
+        file_name:string"""
+        return int(file_name.split('_')[-1][0:-4])
+
+    def traversal_path_with_format(self,path,format_ ='.pcd'):
+        f_names = os.listdir(path)
+        f_format_names = filter(lambda filename:filename[-4:]==format_,f_names)
+        f_format_sort_names = sorted(f_format_names,key=lambda _name: int(_name.split('_')[-1][0:-4]))#,
+        return f_format_sort_names
+
     def load_dataset(self):
-        f_names = sorted(os.listdir(os.path.join(cfg.DATA_DIR,self.folder,'pcd')),key=lambda _name: int(_name[16:-4]))#,
+        f_names = sorted(os.listdir(os.path.join(cfg.DATA_DIR,self.folder,'pcd')),key=lambda _name: int(_name.split('_')[-1][0:-4]))#,
         name_list = []
         for file_ in f_names:
             name_list.append(os.path.join(cfg.DATA_DIR,self.folder,'pcd',file_))
@@ -357,6 +383,20 @@ class DataSetTest(object):  # read txt files one by one
         points_rot = np.matmul(R, points[:, 0:3].transpose())
         return points_rot.transpose()
 
+    def check_name_get_data(self,pcd_path):
+        lidar_data = pcd2np.from_path(pcd_path)
+        angel = 0  # (np_random.rand() - 0.500) * np.pi * 0.95
+        points_rot = self.rotation(lidar_data.pc_data, angel)
+
+        grid_voxel = voxel_grid(points_rot, cfg, thread_sum=cfg.CPU_CNT)
+        blob = dict({'lidar3d_data': np.hstack((points_rot, lidar_data.pc_data[:, 3:4])),
+                     'grid_stack': grid_voxel['feature_buffer'],
+                     'coord_stack': grid_voxel['coordinate_buffer'],
+                     'ptsnum_stack': grid_voxel['number_buffer'],
+                     })
+
+        return blob
+
 def init_dataset(arguments):
     """Get an imdb (image database) by name."""
     if arguments.method == 'train':
@@ -385,14 +425,17 @@ if __name__ == '__main__':
     #     idx += 1
 
     dataset = DataSetTrain()
+    name = '/home/hexindong/Videos/Apoxel-Server/RSdata32b/32_gaosulu_test/pcd/32_gaosulu_test_435.pcd'
+    a = dataset.check_name_get_data(name)
     print(yellow('Convert {} data into pkl file ...').format(dataset.training_rois_length))
     for idx in range(dataset.training_rois_length):
         blobs = dataset.get_minibatch(idx)
         name = blobs['serial_num']
-        data_pkl_name = os.path.join(cfg.DATA_DIR,name.split('/')[0],'data_pkl',name.split('/')[1][:-4]+'.pkl')
-        with open(data_pkl_name, 'wb') as fid:
-            cPickle.dump(blobs, fid, cPickle.HIGHEST_PROTOCOL)
-            # print '  Wrote data_pkl to {}'.format(data_pkl_name)
+        # data_pkl_name = os.path.join(cfg.DATA_DIR,name.split('/')[0],'data_pkl',name.split('/')[1][:-4]+'.pkl')
+        # with open(data_pkl_name, 'wb') as fid:
+        #     cPickle.dump(blobs, fid, cPickle.HIGHEST_PROTOCOL)
+        #     print '  Wrote data_pkl to {}'.format(data_pkl_name)
+
 
 
 

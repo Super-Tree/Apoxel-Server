@@ -54,4 +54,20 @@ def voxel_grid(point_cloud,cfg,thread_sum=4):
 
 
 if __name__ == '__main__':
+    # from tools.py_pcd import point_cloud as pcd2np
+    # from network.config import cfg
+    # fname = '/home/yan/Documents/32_yuanqu_11804041320_1.pcd'
+    # lidar_data = pcd2np.from_path(fname)
+    # grid_voxel = voxel_grid(lidar_data.pc_data, cfg, thread_sum=cfg.CPU_CNT)
+    # outfea = '/home/yan/Documents/deeplearning_lidar/apollo_tensorflow_c_realtime/src/tensorflow_detection/model/feature.txt'
+    # outcoordinate = '/home/yan/Documents/deeplearning_lidar/apollo_tensorflow_c_realtime/src/tensorflow_detection/model/coordinate.txt'
+    # outnum = '/home/yan/Documents/deeplearning_lidar/apollo_tensorflow_c_realtime/src/tensorflow_detection/model/number.txt'
+    # ou = np.array(grid_voxel['feature_buffer'])
+    # np.save(outfea,ou)
+    # co = grid_voxel['coordinate_buffer']
+    # co = np.sort(co,axis=0)
+    # print co[:10]
+    # cou = np.unique(co, axis=0)
+    # np.save(outcoordinate,np.array(grid_voxel['coordinate_buffer']))
+    # np.save(outnum,np.array(grid_voxel['number_buffer']))
     pass

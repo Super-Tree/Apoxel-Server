@@ -253,11 +253,24 @@ def pcd_vispy(scans=None,img=None, boxes=None, name=None, index=0,vis_size=(800,
     vb.camera.scale_factor = 63  # 32.7
 
     if scans is not None:
-        pos = scans[:, :3]
-        scatter = visuals.Markers()
-        scatter.set_gl_state('translucent', depth_test=False)
-        scatter.set_data(pos, edge_width=0, face_color=(1, 1, 1, 1), size=point_size, scaling=True)
-        vb.add(scatter)
+        if not isinstance(scans, list):
+            pos = scans[:, :3]
+            scatter = visuals.Markers()
+            scatter.set_gl_state('translucent', depth_test=False)
+            scatter.set_data(pos, edge_width=0, face_color=(1, 1, 1, 1), size=point_size, scaling=True)
+            vb.add(scatter)
+        else:
+            pos = scans[0][:, :3]
+            scatter = visuals.Markers()
+            scatter.set_gl_state('translucent', depth_test=False)
+            scatter.set_data(pos, edge_width=0, face_color=(1, 1, 1, 1), size=point_size, scaling=True)
+            vb.add(scatter)
+
+            pos = scans[1][:, :3]
+            scatter = visuals.Markers()
+            scatter.set_gl_state('translucent', depth_test=False)
+            scatter.set_data(pos, edge_width=0, face_color=(0, 1, 1, 1), size=point_size, scaling=True)
+            vb.add(scatter)
 
     axis = visuals.XYZAxis()
     vb.add(axis)
