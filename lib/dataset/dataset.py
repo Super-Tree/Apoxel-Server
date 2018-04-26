@@ -80,13 +80,13 @@ class DataSetTrain(object):  # read txt files one by one
         return train_set, valid_set, test_set
 
     def load_sti_annotation(self):
-        total_box_labels, total_fnames, total_object_labels, total_confidence_labels = [], [], [], []
+        total_box_labels, total_fnames, total_object_labels, total_height_labels = [], [], [], []
         for index, folder in enumerate(self.folder_list):
             print(green('  Prcess the folder {}'.format(folder)))
-            #TODO:declaration: the result.txt file in shrink_box_label_bk contains illegal number like: "x":"-1.#IND00","y":"-1.#IND00","z":"-1.#IND00"
+            #  TODO:declaration: the result.txt file in shrink_box_label_bk contains illegal number like: "x":"-1.#IND00","y":"-1.#IND00","z":"-1.#IND00"
             libel_fname = path_add(self.data_path, folder, 'label', 'result.txt')
             pixel_libel_folder = path_add(self.data_path, folder, 'label_rect')
-            box_label, files_names, one_object_label, one_no_ground_label = [], [], [], []
+            box_label, files_names, one_object_label, one_height_label = [], [], [], []
             with open(libel_fname, 'r') as f:
                 frames = f.readlines()
             for idx__,one_frame in enumerate(frames):  # one frame in a series data
@@ -116,25 +116,27 @@ class DataSetTrain(object):  # read txt files one by one
                     continue
                 box_label.append(label_in_frame_np[:, (0, 1, 2, 6, 7, 8, 3, 9)])  # extract the valuable data:x,y,z,l,w,h,theta,type
                 files_names.append(self.get_fname_from_label(one_frame))
+
             print ("    Loading .npy labels ... ")
             for file_ in sorted(os.listdir(pixel_libel_folder), key=lambda name: int(name[0:-4])):
                 data_matrix = np.load(path_add(pixel_libel_folder, file_))
                 one_object_label.append(data_matrix[:, :, 0:1])  # TODO:check
-                # one_no_ground_label.append(data_matrix[:, :, 6:7])
-            print ("  Completing loading {} is done!  ".format(folder))
+                one_height_label.append(data_matrix[:, :, 1:2])
             assert len(one_object_label) == len(files_names), "There happens a ERROR when generating dataset in dataset.py"
             total_box_labels.extend(box_label)
             total_fnames.extend(files_names)
             total_object_labels.extend(one_object_label)
-            # total_confidence_labels.extend(one_no_ground_label)
+            total_height_labels.extend(one_height_label)
+            print ("  Completing loading {} is done!  ".format(folder))
+
         print("  Zip data in one dict ... ")
         return_dataset = [dict({'files_name': total_fnames[i],
                                 'boxes_labels': total_box_labels[i],
                                 'object_labels': total_object_labels[i],
-                                # 'confidence_labels': total_confidence_labels[i]
+                                'height_labels': total_height_labels[i]
                                 }
-                               )
-                          for i in range(len(total_fnames))]
+                               ) for i in range(len(total_fnames))]
+
         print("  Total number of frames is {}".format(len(total_fnames)))
         return return_dataset
 
@@ -323,7 +325,7 @@ class DataSetTrain(object):  # read txt files one by one
 class DataSetTest(object):  # read txt files one by one
     def __init__(self):
         self.data_path = cfg.DATA_DIR
-        self.folder = 'demo_test_yuanqu'
+        self.folder = 'demo_test_gaosulu'
         self.test_set = self.load_dataset()
         self.testing_rois_length = len(self.test_set)
         print blue('Dataset initialization has been done successfully.')
@@ -425,9 +427,11 @@ if __name__ == '__main__':
     #     idx += 1
 
     dataset = DataSetTrain()
+    print red('Generate dataset Done!!')
+    exit(0)
     name = '/home/hexindong/Videos/Apoxel-Server/RSdata32b/32_gaosulu_test/pcd/32_gaosulu_test_435.pcd'
     a = dataset.check_name_get_data(name)
-    print(yellow('Convert {} data into pkl file ...').format(dataset.training_rois_length))
+    # print(yellow('Convert {} data into pkl file ...').format(dataset.training_rois_length))
     for idx in range(dataset.training_rois_length):
         blobs = dataset.get_minibatch(idx)
         name = blobs['serial_num']

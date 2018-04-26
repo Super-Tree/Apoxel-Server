@@ -7,7 +7,7 @@ from tensorflow.python.client import timeline
 from tools.data_visualize import pcd_vispy, vispy_init
 
 DEBUG = False
-SUFFIX ='M4-E7_yuanqu'
+SUFFIX ='M5-E6_gaosulu_pointcnt_50'
 
 class TrainProcessor(object):
     def __init__(self, network, data_set, args):
@@ -30,7 +30,7 @@ class TrainProcessor(object):
 
     def save_res_as_pcd(self,pointcloud,map,fname):
         import numpy as np
-        from tools.utils import bounding_trans_lidar2bv
+        from tools.utils import bound_trans_lidar2bv
 
         map = map.reshape(cfg.CUBIC_RES[0], cfg.CUBIC_RES[1])
         coordinate = np.array(np.where(map!=0),dtype=np.int32).transpose()
@@ -40,7 +40,7 @@ class TrainProcessor(object):
         pointcloud[:,3]=np.zeros([pointcloud.shape[0]],dtype=np.float32)
 
         center = np.array([cfg.DETECTION_RANGE, cfg.DETECTION_RANGE, 0], dtype=np.float32)
-        shifted_coord = bounding_trans_lidar2bv(pointcloud[:,0:3], center)
+        shifted_coord = bound_trans_lidar2bv(pointcloud[:, 0:3], center)
         voxel_size = np.array(cfg.CUBIC_RES, dtype=np.float32)
         voxel_index = np.floor(shifted_coord[:, 0:2] / voxel_size).astype(np.int)
 
@@ -205,7 +205,7 @@ class TestProcessor(object):
 
     def save_res_as_pcd(self,pointcloud,map,save_path,folder,idx_):
         import numpy as np
-        from tools.utils import bounding_trans_lidar2bv
+        from tools.utils import bound_trans_lidar2bv
         from tools.py_pcd import point_cloud
 
         map = map.reshape(cfg.CUBIC_SIZE[0], cfg.CUBIC_SIZE[1])
@@ -215,7 +215,7 @@ class TestProcessor(object):
         pointcloud[:,3]=np.zeros([pointcloud.shape[0]],dtype=np.float32)
 
         center = np.array([cfg.DETECTION_RANGE, cfg.DETECTION_RANGE, 0], dtype=np.float32)
-        shifted_coord = bounding_trans_lidar2bv(pointcloud[:,0:3], center)
+        shifted_coord = bound_trans_lidar2bv(pointcloud[:, 0:3], center)
         voxel_size = np.array(cfg.CUBIC_RES, dtype=np.float32)
         voxel_index = np.floor(shifted_coord[:, 0:2] / voxel_size).astype(np.int)
 

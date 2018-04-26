@@ -61,7 +61,7 @@ def checkArgs(Args):
             print red("  Specify the testing network weights!")
             sys.exit(3)
         else:
-            print blue("  Test the weight: \n {}".format(Args.weights))
+            print blue("  Test the weight: \n    {}".format(Args.weights))
     elif Args.fine_tune:
             if Args.weights is None:
                 print red("  Specify the finetune network weights!")
@@ -77,6 +77,7 @@ if __name__ == '__main__':
     # import numpy as np
     # np.random.seed(5)
     import os
+
     os.environ["CUDA_VISIBLE_DEVICES"] = '3'
 
     args = parse_args()
@@ -88,3 +89,5 @@ if __name__ == '__main__':
     network = init_network(args)  # load network model
 
     start_process(network, data_set, args)
+
+    p = os.system('chmod -R 777 /home/hexindong/he/Apoxel-Server')

@@ -31,9 +31,16 @@ def bounding_filter(points,box=(0,0)):
 
     return filter_points
 
-def bounding_trans_lidar2bv(points,center):
+def bound_trans_lidar2bv(points, center):
     points = bounding_filter(points)
     points = (points-center)*np.array([-1,-1,1])
     points = points[:,(0,1,2)]#TODO:be careful
 
     return points
+
+
+def trans_bv2lidar(coord,center=(320,320)):
+    coord = (coord-center)*np.array([-1,-1])
+    coord = coord[:,(0,1)]#TODO:be careful
+
+    return coord

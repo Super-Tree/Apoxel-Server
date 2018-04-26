@@ -17,7 +17,7 @@ __C.TEST_RESULT = osp.abspath(osp.join(__C.ROOT_DIR, 'test_result'))
 
 __C.CPU_CNT=cpu_count()
 
-__C.VOXEL_POINT_COUNT =100
+__C.VOXEL_POINT_COUNT =50
 __C.DETECTION_RANGE = 60.0
 __C.Z_AXIS_MIN = -2.0
 __C.Z_AXIS_MAX = 4.0
