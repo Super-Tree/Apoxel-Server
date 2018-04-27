@@ -11,8 +11,7 @@ class TrainNet(Net):
         # [N, 4]
         self.pc_input = tf.placeholder(tf.float32, shape=[None, 4], name='pointcloud')
         # [ΣK, 200, 6]
-        self.voxel_feature = tf.placeholder(
-            tf.float32, [None, cfg.VOXEL_POINT_COUNT, 6], name='grid')
+        self.voxel_feature = tf.placeholder(tf.float32, [None, cfg.VOXEL_POINT_COUNT, 6], name='grid')
         # [ΣK, 3], each row stores (batch, d, w)
         self.coordinate = tf.placeholder(tf.int64, [None, 2], name='coordinate')
         # [ΣK]
@@ -20,21 +19,26 @@ class TrainNet(Net):
 
         self.gt_map = tf.placeholder(tf.int64, shape=[cfg.CUBIC_SIZE[0],cfg.CUBIC_SIZE[1], 1],name='gt_map')
 
+        self.apollo_8feature = tf.placeholder(tf.float32, shape=[None, cfg.CUBIC_SIZE[0], cfg.CUBIC_SIZE[1], 8], name='apollo_feature')
+
         self.vfe_feature = self.vfe_encoder(vfe_size=(32, 128, 32), name="VFE-Encoder", training=True)
-        self.predicted_map = self.apollo_net(self.vfe_feature)
+
+        self.apollo_input = tf.concat([self.vfe_feature, self.apollo_8feature], axis=3)
+
+        self.predicted_map = self.apollo_net(self.apollo_input)
 
         # with tf.variable_scope('OutResult'):
         #     tf.get_variable()
 
     def apollo_net(self, vfe_map_feature):
-        with tf.variable_scope('conv-block0') as scope:
-            conv0_1 = self.conv2d_relu(vfe_map_feature, num_kernels=24, kernel_size=(1, 1), stride=[1, 1, 1, 1],
-                                       padding='VALID', name='conv0_1')
-            conv0 = self.conv2d_relu(conv0_1, num_kernels=24, kernel_size=(3, 3), stride=[1, 1, 1, 1],
-                                     padding='SAME', name='conv0')
+        # with tf.variable_scope('conv-block0') as scope:
+        #     conv0_1 = self.conv2d_relu(vfe_map_feature, num_kernels=24, kernel_size=(1, 1), stride=[1, 1, 1, 1],
+        #                                padding='VALID', name='conv0_1')
+        #     conv0 = self.conv2d_relu(conv0_1, num_kernels=24, kernel_size=(3, 3), stride=[1, 1, 1, 1],
+        #                              padding='SAME', name='conv0')
 
         with tf.variable_scope('conv-block1') as scope:
-            conv1_1 = self.conv2d_relu(conv0, num_kernels=48, kernel_size=(3, 3), stride=[1, 2, 2, 1],
+            conv1_1 = self.conv2d_relu(vfe_map_feature, num_kernels=48, kernel_size=(3, 3), stride=[1, 2, 2, 1],
                                        padding='SAME', name='conv1_1')
             conv1 = self.conv2d_relu(conv1_1, num_kernels=48, kernel_size=(3, 3), stride=[1, 1, 1, 1],
                                      padding='SAME', name='conv1')
@@ -169,27 +173,31 @@ class TestNet(Net):
         super(TestNet, self).__init__()
 
         # [N, 4]
-        self.pc_input = tf.placeholder(tf.float32, shape=[None, 4])
+        self.pc_input = tf.placeholder(tf.float32, shape=[None, 4], name='pointcloud')
         # [ΣK, 200, 6]
-        self.voxel_feature = tf.placeholder(
-            tf.float32, [None, cfg.VOXEL_POINT_COUNT, 6], name='feature')
+        self.voxel_feature = tf.placeholder(tf.float32, [None, cfg.VOXEL_POINT_COUNT, 6], name='grid')
         # [ΣK, 3], each row stores (batch, d, w)
         self.coordinate = tf.placeholder(tf.int64, [None, 2], name='coordinate')
         # [ΣK]
         self.number = tf.placeholder(tf.int64, [None], name='number')
 
+        self.apollo_8feature = tf.placeholder(tf.float32, shape=[None, cfg.CUBIC_SIZE[0], cfg.CUBIC_SIZE[1], 8], name='apollo_feature')
+
         self.vfe_feature = self.vfe_encoder(vfe_size=(32, 128, 32), name="VFE-Encoder", training=True)
-        self.predicted_map = self.apollo_net(self.vfe_feature)
+
+        self.apollo_input = tf.concat([self.vfe_feature, self.apollo_8feature], axis=3)
+
+        self.predicted_map = self.apollo_net(self.apollo_input)
 
     def apollo_net(self, vfe_map_feature):
-        with tf.variable_scope('conv-block0') as scope:
-            conv0_1 = self.conv2d_relu(vfe_map_feature, num_kernels=24, kernel_size=(1, 1), stride=[1, 1, 1, 1],
-                                       padding='VALID', name='conv0_1')
-            conv0 = self.conv2d_relu(conv0_1, num_kernels=24, kernel_size=(3, 3), stride=[1, 1, 1, 1],
-                                     padding='SAME', name='conv0')
+        # with tf.variable_scope('conv-block0') as scope:
+        #     conv0_1 = self.conv2d_relu(vfe_map_feature, num_kernels=24, kernel_size=(1, 1), stride=[1, 1, 1, 1],
+        #                                padding='VALID', name='conv0_1')
+        #     conv0 = self.conv2d_relu(conv0_1, num_kernels=24, kernel_size=(3, 3), stride=[1, 1, 1, 1],
+        #                              padding='SAME', name='conv0')
 
         with tf.variable_scope('conv-block1') as scope:
-            conv1_1 = self.conv2d_relu(conv0, num_kernels=48, kernel_size=(3, 3), stride=[1, 2, 2, 1],
+            conv1_1 = self.conv2d_relu(vfe_map_feature, num_kernels=48, kernel_size=(3, 3), stride=[1, 2, 2, 1],
                                        padding='SAME', name='conv1_1')
             conv1 = self.conv2d_relu(conv1_1, num_kernels=48, kernel_size=(3, 3), stride=[1, 1, 1, 1],
                                      padding='SAME', name='conv1')
