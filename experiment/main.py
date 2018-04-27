@@ -78,7 +78,7 @@ if __name__ == '__main__':
     # np.random.seed(5)
     import os
 
-    os.environ["CUDA_VISIBLE_DEVICES"] = '3'
+    os.environ["CUDA_VISIBLE_DEVICES"] = '1'
 
     args = parse_args()
 

@@ -81,11 +81,13 @@ class TrainProcessor(object):
             cnt = tf.shape(self.net.coordinate)[0]
             updates = tf.ones([cnt], dtype=tf.float32)
             input_map = tf.reshape(tf.scatter_nd(self.net.coordinate, updates, shape=[640, 640]), (-1, 640, 640, 1))
-            # final_res = input_map*res_map
             tf.summary.image('InputData', input_map)
             tf.summary.image('PredMap', res_map)
             tf.summary.image('GtMap', gt_map)
-            # tf.summary.image('FilterResult', final_res)
+
+            # apollo_feature = tf.transposes(self.net.apollo_8feature, perm=[3, 1, 2, 0])
+            # tf.summary.image('ApolloFeature', apollo_feature, max_outputs=8)
+
             tf.summary.scalar('TrainLoss', loss)
 
             glb_var = tf.trainable_variables()
@@ -121,6 +123,7 @@ class TrainProcessor(object):
                     self.net.coordinate: blobs['coord_stack'],
                     self.net.number: blobs['ptsnum_stack'],
                     self.net.gt_map: blobs['object_labels'],
+                    self.net.apollo_8feature: blobs['apollo_8feature'],
                 }
 
                 run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
@@ -277,6 +280,7 @@ class TestProcessor(object):
                 self.net.voxel_feature: blobs['grid_stack'],
                 self.net.coordinate: blobs['coord_stack'],
                 self.net.number: blobs['ptsnum_stack'],
+                self.net.apollo_8feature: blobs['apollo_8feature'],
             }
 
             run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
