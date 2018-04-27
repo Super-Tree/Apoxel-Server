@@ -18,7 +18,7 @@ from numpy import random as np_random
 class DataSetTrain(object):  # read txt files one by one
     def __init__(self):
         self.data_path = cfg.DATA_DIR
-        # self.folder_list = ['32beams_dingdianlukou_2018-03-12-11-02-41']
+        # self.folder_list = ['32_yuanqu_11804041320']
         self.folder_list = ['32_yuanqu_11804041320','p3_beihuan_B16_11803221546','32beams_dingdianlukou_2018-03-12-11-02-41', '32_daxuecheng_01803191740', '32_gaosulu_test','xuanchuan']
         self._classes = ['unknown', 'smallMot', 'bigMot', 'nonMot', 'pedestrian']#TODO:declare: there is another label dont care! becareful
         self.type_to_keep = ['smallMot', 'bigMot', 'nonMot', 'pedestrian']
@@ -82,7 +82,7 @@ class DataSetTrain(object):  # read txt files one by one
     def load_sti_annotation(self):
         total_box_labels, total_fnames, total_object_labels, total_height_labels = [], [], [], []
         for index, folder in enumerate(self.folder_list):
-            print(green('  Prcess the folder {}'.format(folder)))
+            print(green('  Process the folder {}'.format(folder)))
             #  TODO:declaration: the result.txt file in shrink_box_label_bk contains illegal number like: "x":"-1.#IND00","y":"-1.#IND00","z":"-1.#IND00"
             libel_fname = path_add(self.data_path, folder, 'label', 'result.txt')
             pixel_libel_folder = path_add(self.data_path, folder, 'label_rect')
@@ -139,6 +139,11 @@ class DataSetTrain(object):  # read txt files one by one
 
         print("  Total number of frames is {}".format(len(total_fnames)))
         return return_dataset
+
+    def extract_name(self, file_name):
+        """32_gaosulu_test_1.pcd
+        file_name:string"""
+        return int(file_name.split('_')[-1][0:-4])
 
     def assign_dataset(self, data):
         cnt = len(data)
@@ -225,13 +230,6 @@ class DataSetTrain(object):  # read txt files one by one
             index_dataset = self.test_set
 
         fname = index_dataset[_idx]['files_name']
-        # print 'load this file: ',fname
-        #TODO:action:puts data in pkl files to accelerate the training process
-        # data_pkl_cache = os.path.join(cfg.DATA_DIR,fname.split('/')[0],'data_pkl',fname.split('/')[1][:-4]+'.pkl')
-        # if os.path.exists(data_pkl_cache):
-        #     with open(data_pkl_cache, 'rb') as fid:
-        #         blob = cPickle.load(fid)
-        #         print '  load data_pkl to {}'.format(data_pkl_cache)
 
         timer = Timer()
         timer.tic()
@@ -247,16 +245,25 @@ class DataSetTrain(object):  # read txt files one by one
         grid_voxel = voxel_grid(points_rot, cfg, thread_sum=cfg.CPU_CNT)
         timer.toc()
         time2 = timer.average_time
-        blob = dict({'serial_num': fname,
-                     'lidar3d_data': np.hstack((points_rot,lidar_data.pc_data[:,3:4])),
 
+        timer.tic()
+        apollo_8feature = np.load(path_add(self.data_path, fname.split('/')[0], 'feature_pcd_name', fname.split('/')[1][0:-4]+'.npy')).reshape(-1, cfg.CUBIC_SIZE[0], cfg.CUBIC_SIZE[1], 8)
+        apollo_8feature_rot = self.apollo_feature_rotation(apollo_8feature,degree=angel*57.29578)
+        timer.toc()
+        time3 = timer.average_time
+
+        blob = dict({'serial_num': fname,
+                     'voxel_gen_time': (time1, time2,time3),
+
+                     'lidar3d_data': np.hstack((points_rot,lidar_data.pc_data[:,3:4])),
                      'boxes_labels': boxes_rot,
                      'object_labels': category_rot,
-                     # 'confidence_labels': index_dataset[_idx]['confidence_labels'],
+
                      'grid_stack': grid_voxel['feature_buffer'],
                      'coord_stack': grid_voxel['coordinate_buffer'],
                      'ptsnum_stack': grid_voxel['number_buffer'],
-                     'voxel_gen_time': (time1, time2)
+
+                     'apollo_8feature': apollo_8feature_rot,
                      })
 
         return blob
@@ -277,6 +284,16 @@ class DataSetTrain(object):  # read txt files one by one
         label_rot = cv2.warpAffine(labels, matRotation, (cfg.CUBIC_SIZE[0],cfg.CUBIC_SIZE[1]), borderValue=0)
 
         return label_rot.reshape(shape_)
+
+    def apollo_feature_rotation(self,feature,degree):
+        shape_ = feature.shape
+        features = feature.reshape([cfg.CUBIC_SIZE[0],cfg.CUBIC_SIZE[1],8])
+        matRotation = cv2.getRotationMatrix2D((cfg.CUBIC_SIZE[0] / 2, cfg.CUBIC_SIZE[1] / 2), degree, 1.0)
+        feature_rot_part = cv2.warpAffine(features[:,:,(0,1,2,4,5,7)], matRotation, (cfg.CUBIC_SIZE[0],cfg.CUBIC_SIZE[1]), borderValue=0)
+
+        rot_feature = np.dstack((feature_rot_part,features[:,:,(3,6)]))
+
+        return rot_feature.reshape(shape_)
 
     @staticmethod
     def get_fname_from_label(strings):
@@ -309,7 +326,7 @@ class DataSetTrain(object):  # read txt files one by one
 
     def check_name_get_data(self,pcd_path):
         lidar_data = pcd2np.from_path(pcd_path)
-        angel = 0  # (np_random.rand() - 0.500) * np.pi * 0.95
+        angel =0  # (np_random.rand() - 0.500) * np.pi * 0.95
         points_rot = self.rotation(lidar_data.pc_data, angel)
 
         grid_voxel = voxel_grid(points_rot, cfg, thread_sum=cfg.CPU_CNT)
@@ -357,7 +374,7 @@ class DataSetTest(object):  # read txt files one by one
         timer = Timer()
         timer.tic()
         lidar_data = pcd2np.from_path(fname)
-        angel = 0 #(np_random.rand() - 0.500) * np.pi * 0.9
+        angel = 0  # (np_random.rand() - 0.500) * np.pi * 0.9
         points_rot = self.rotation(lidar_data.pc_data,angel)
         timer.toc()
         time1 = timer.average_time
@@ -366,16 +383,35 @@ class DataSetTest(object):  # read txt files one by one
         grid_voxel = voxel_grid(points_rot, cfg, thread_sum=cfg.CPU_CNT)
         timer.toc()
         time2 = timer.average_time
+
+        timer.tic()
+        apollo_8feature = np.load(path_add(self.data_path, fname.split('/')[0], 'feature_pcd_name', fname.split('/')[1][0:-4]+'.npy')).reshape(-1, cfg.CUBIC_SIZE[0], cfg.CUBIC_SIZE[1], 8)
+        apollo_8feature_rot = self.apollo_feature_rotation(apollo_8feature, degree=angel*57.29578)
+        timer.toc()
+        time3 = timer.average_time
+
         blob = dict({'serial_num': fname.split('/')[-1],
                      'lidar3d_data': lidar_data.pc_data,
 
                      'grid_stack': grid_voxel['feature_buffer'],
                      'coord_stack': grid_voxel['coordinate_buffer'],
                      'ptsnum_stack': grid_voxel['number_buffer'],
-                     'voxel_gen_time': (time1, time2)
+
+                     'apollo_8feature': apollo_8feature_rot,
+                     'voxel_gen_time': (time1, time2, time3)
                      })
 
         return blob
+
+    def apollo_feature_rotation(self,feature,degree):
+        shape_ = feature.shape
+        features = feature.reshape([cfg.CUBIC_SIZE[0],cfg.CUBIC_SIZE[1],8])
+        matRotation = cv2.getRotationMatrix2D((cfg.CUBIC_SIZE[0] / 2, cfg.CUBIC_SIZE[1] / 2), degree, 1.0)
+        feature_rot_part = cv2.warpAffine(features[:,:,(0,1,2,4,5,7)], matRotation, (cfg.CUBIC_SIZE[0],cfg.CUBIC_SIZE[1]), borderValue=0)
+
+        rot_feature = np.dstack((feature_rot_part,features[:,:,(3,6)]))
+
+        return rot_feature.reshape(shape_)
 
     def rotation(self,points, rotation):
         # points: numpy array;  translation: moving scalar which should be small
