@@ -1,5 +1,6 @@
 import random
 import os
+import numpy as np
 import tensorflow as tf
 from tools.timer import Timer
 from network.config import cfg
@@ -57,13 +58,14 @@ class TrainProcessor(object):
             labels = tf.reshape(tf.one_hot(tf.reshape(self.net.gt_map, (-1, 1)), depth=2, dtype=tf.float32), (-1, 2))
             scores_softmax = tf.nn.softmax(scores)
             # focal loss
+            # balance = np.array([1,1],dtype=np.float32)
+            balance = 50.0
             if cfg.TRAIN.FOCAL_LOSS:
                 # TODO:add +- balance
-                cross_entropy = -tf.reduce_sum(
-                    tf.multiply(labels * ((1 - scores_softmax) ** 3) * tf.log(scores_softmax + epsilon), 50), axis=[1])
+                cross_entropy = -tf.reduce_sum(tf.multiply(labels * ((1 - scores_softmax) ** 3) * tf.log(scores_softmax + epsilon), balance), axis=[1])
             else:
                 pass
-                cross_entropy = -tf.reduce_sum(tf.multiply(labels * tf.log(scores_softmax + epsilon), 50), axis=[1])
+                cross_entropy = -tf.reduce_sum(tf.multiply(labels * tf.log(scores_softmax + epsilon), balance), axis=[1])
 
             cross_entropy_mean = tf.reduce_mean(cross_entropy, name='cross_entropy')
             loss = cross_entropy_mean
@@ -175,6 +177,7 @@ class TrainProcessor(object):
                             self.net.coordinate: blobs['coord_stack'],
                             self.net.number: blobs['ptsnum_stack'],
                             self.net.gt_map: blobs['object_labels'],
+                            self.net.apollo_8feature: blobs['apollo_8feature'],
 
                         }
                         valid_sum_,loss_valid_ = sess.run([valid_image_summary,loss], feed_dict=feed_dict_)

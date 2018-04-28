@@ -171,7 +171,6 @@ class TrainNet(Net):
 class TestNet(Net):
     def __init__(self):
         super(TestNet, self).__init__()
-
         # [N, 4]
         self.pc_input = tf.placeholder(tf.float32, shape=[None, 4], name='pointcloud')
         # [ΣK, 200, 6]
