@@ -1,8 +1,11 @@
 
 import numpy as np
-from tools.utils import bound_trans_lidar2bv
+from network.config import cfg
+
 
 def voxel_grid(point_cloud,cfg,thread_sum=4):
+    from tools.utils import bound_trans_lidar2bv
+
     # Input:
     #   (N, 3):only x,y,z
     # Output:
@@ -15,7 +18,7 @@ def voxel_grid(point_cloud,cfg,thread_sum=4):
     # pcd_vispy(point_cloud)
     center = np.array([cfg.DETECTION_RANGE, cfg.DETECTION_RANGE,0],dtype=np.float32)
     shifted_coord = bound_trans_lidar2bv(point_cloud, center)
-    np.random.shuffle(point_cloud)
+    np.random.shuffle(shifted_coord)
     # pcd_vispy(shifted_coord)
 
     voxel_size = np.array(cfg.CUBIC_RES, dtype=np.float32)
@@ -38,7 +41,7 @@ def voxel_grid(point_cloud,cfg,thread_sum=4):
     for i in range(K):
         index_buffer[tuple(coordinate_buffer[i])] = i
 
-    for voxel, point in zip(voxel_index, point_cloud):
+    for voxel, point in zip(voxel_index, shifted_coord):
         index = index_buffer[tuple(voxel)]
         number = number_buffer[index]
         if number < T:
@@ -54,4 +57,12 @@ def voxel_grid(point_cloud,cfg,thread_sum=4):
 
 
 if __name__ == '__main__':
+    from dataset import DataSetTrain
+
+    dataset = DataSetTrain()
+    name = '/home/hexindong/Videos/Apoxel-Server/RSdata32b/32_gaosulu_test/pcd/32_gaosulu_test_435.pcd'
+    data = dataset.check_name_get_data(name)
+    points = data['lidar3d_data']
+
+    grid = voxel_grid(points,cfg)
     pass
