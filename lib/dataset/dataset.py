@@ -345,7 +345,7 @@ class DataSetTest(object):  # read txt files one by one
         self.folder = 'demo_test_gaosulu'
         self.test_set = self.load_dataset()
         self.testing_rois_length = len(self.test_set)
-        print blue('Dataset initialization has been done successfully.')
+        print blue('Dataset {} initialization has been done successfully.'.format(self.testing_rois_length))
         time.sleep(2)
 
     def extract_name(self, file_name):
@@ -385,7 +385,7 @@ class DataSetTest(object):  # read txt files one by one
         time2 = timer.average_time
 
         timer.tic()
-        apollo_8feature = np.load(path_add(self.data_path, fname.split('/')[0], 'feature_pcd_name', fname.split('/')[1][0:-4]+'.npy')).reshape(-1, cfg.CUBIC_SIZE[0], cfg.CUBIC_SIZE[1], 8)
+        apollo_8feature = np.load(path_add(self.data_path, fname.split('/')[-3], 'feature_pcd_name', fname.split('/')[-1][0:-4]+'.npy')).reshape(-1, cfg.CUBIC_SIZE[0], cfg.CUBIC_SIZE[1], 8)
         apollo_8feature_rot = self.apollo_feature_rotation(apollo_8feature, degree=angel*57.29578)
         timer.toc()
         time3 = timer.average_time
@@ -464,13 +464,17 @@ if __name__ == '__main__':
 
     dataset = DataSetTrain()
     print red('Generate dataset Done!!')
-    exit(0)
-    name = '/home/hexindong/Videos/Apoxel-Server/RSdata32b/32_gaosulu_test/pcd/32_gaosulu_test_435.pcd'
-    a = dataset.check_name_get_data(name)
+
+    # name = '/home/hexindong/Videos/Apoxel-Server/RSdata32b/32_gaosulu_test/pcd/32_gaosulu_test_435.pcd'
+    # a = dataset.check_name_get_data(name)
     # print(yellow('Convert {} data into pkl file ...').format(dataset.training_rois_length))
     for idx in range(dataset.training_rois_length):
         blobs = dataset.get_minibatch(idx)
         name = blobs['serial_num']
+        points = blobs['grid_stack']
+        a = 0
+        # np.save('/home/hexindong/he/Apoxel-Server/32_yuanqu_11804041320_152.npy',points)
+        # exit()
         # data_pkl_name = os.path.join(cfg.DATA_DIR,name.split('/')[0],'data_pkl',name.split('/')[1][:-4]+'.pkl')
         # with open(data_pkl_name, 'wb') as fid:
         #     cPickle.dump(blobs, fid, cPickle.HIGHEST_PROTOCOL)

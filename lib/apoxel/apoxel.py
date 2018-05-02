@@ -8,7 +8,7 @@ from tensorflow.python.client import timeline
 from tools.data_visualize import pcd_vispy, vispy_init
 
 DEBUG = False
-SUFFIX ='M5-E6_gaosulu_pointcnt_50'
+SUFFIX ='M7-E44_gaosulu_pointcnt_50'
 
 class TrainProcessor(object):
     def __init__(self, network, data_set, args):
@@ -28,28 +28,28 @@ class TrainProcessor(object):
         filename = os.path.join(output_dir, 'Apoxel_Epoch_{:d}'.format(iter) + '.ckpt')
         self.saver.save(sess, filename)
         print 'Wrote snapshot to: {:s}'.format(filename)
-
-    def save_res_as_pcd(self,pointcloud,map,fname):
-        import numpy as np
-        from tools.utils import bound_trans_lidar2bv
-
-        map = map.reshape(cfg.CUBIC_RES[0], cfg.CUBIC_RES[1])
-        coordinate = np.array(np.where(map!=0),dtype=np.int32).transpose()
-        print 'coordinate shape:{}'.format(coordinate.shape)
-        print coordinate
-
-        pointcloud[:,3]=np.zeros([pointcloud.shape[0]],dtype=np.float32)
-
-        center = np.array([cfg.DETECTION_RANGE, cfg.DETECTION_RANGE, 0], dtype=np.float32)
-        shifted_coord = bound_trans_lidar2bv(pointcloud[:, 0:3], center)
-        voxel_size = np.array(cfg.CUBIC_RES, dtype=np.float32)
-        voxel_index = np.floor(shifted_coord[:, 0:2] / voxel_size).astype(np.int)
-
-        keep = np.where(np.array([True if voxel_index[i] in map else False for i in range(voxel_index.shape[0])],
-                              dtype=np.bool) == True)[0]
-        # pointcloud[map[:,0], map[:,1]] = np.ones([map.shape[0]], dtype=np.float32)
-        pointcloud[keep, 3] = np.ones([keep.shape[0]], dtype=np.float32)
-        print 'Done'
+    #
+    # def save_res_as_pcd(self,pointcloud,map,fname):
+    #     import numpy as np
+    #     from tools.utils import bound_trans_lidar2bv
+    #
+    #     map = map.reshape(cfg.CUBIC_RES[0], cfg.CUBIC_RES[1])
+    #     coordinate = np.array(np.where(map!=0),dtype=np.int32).transpose()
+    #     print 'coordinate shape:{}'.format(coordinate.shape)
+    #     print coordinate
+    #
+    #     pointcloud[:,3]=np.zeros([pointcloud.shape[0]],dtype=np.float32)
+    #
+    #     center = np.array([cfg.DETECTION_RANGE, cfg.DETECTION_RANGE, 0], dtype=np.float32)
+    #     shifted_coord = bound_trans_lidar2bv(pointcloud[:, 0:3], center)
+    #     voxel_size = np.array(cfg.CUBIC_RES, dtype=np.float32)
+    #     voxel_index = np.floor(shifted_coord[:, 0:2] / voxel_size).astype(np.int)
+    #
+    #     keep = np.where(np.array([True if voxel_index[i] in map else False for i in range(voxel_index.shape[0])],
+    #                           dtype=np.bool) == True)[0]
+    #     # pointcloud[map[:,0], map[:,1]] = np.ones([map.shape[0]], dtype=np.float32)
+    #     pointcloud[keep, 3] = np.ones([keep.shape[0]], dtype=np.float32)
+    #     print 'Done'
 
     def processor(self, sess, train_writer):
         with tf.name_scope('loss_design'):
