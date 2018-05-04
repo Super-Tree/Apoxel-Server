@@ -342,7 +342,7 @@ class DataSetTrain(object):  # read txt files one by one
 class DataSetTest(object):  # read txt files one by one
     def __init__(self):
         self.data_path = cfg.DATA_DIR
-        self.folder = 'demo_test_gaosulu'
+        self.folder = 'demo_p3_gaojiaqiao'
         self.test_set = self.load_dataset()
         self.testing_rois_length = len(self.test_set)
         print blue('Dataset {} initialization has been done successfully.'.format(self.testing_rois_length))

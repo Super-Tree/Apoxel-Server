@@ -8,7 +8,7 @@ from tensorflow.python.client import timeline
 from tools.data_visualize import pcd_vispy, vispy_init
 
 DEBUG = False
-SUFFIX ='M7-E44_gaosulu_pointcnt_50'
+SUFFIX ='M5-E6_test_gaojiaqiao_pointcnt_50'
 
 class TrainProcessor(object):
     def __init__(self, network, data_set, args):
@@ -20,7 +20,7 @@ class TrainProcessor(object):
         self.epoch = self.dataset.training_rois_length
         self.val_epoch = self.dataset.validing_rois_length
 
-    def snapshot(self, sess, iter=None):
+    def snapshot(self, sess,iter=None):
         output_dir = os.path.join(cfg.ROOT_DIR, 'output', self.random_folder)
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
@@ -28,7 +28,7 @@ class TrainProcessor(object):
         filename = os.path.join(output_dir, 'Apoxel_Epoch_{:d}'.format(iter) + '.ckpt')
         self.saver.save(sess, filename)
         print 'Wrote snapshot to: {:s}'.format(filename)
-    #
+
     # def save_res_as_pcd(self,pointcloud,map,fname):
     #     import numpy as np
     #     from tools.utils import bound_trans_lidar2bv
@@ -87,7 +87,7 @@ class TrainProcessor(object):
             tf.summary.image('PredMap', res_map)
             tf.summary.image('GtMap', gt_map)
 
-            # apollo_feature = tf.transposes(self.net.apollo_8feature, perm=[3, 1, 2, 0])
+            # apollo_feature = tf.transpose(self.net.apollo_8feature, perm=[3, 1, 2, 0])
             # tf.summary.image('ApolloFeature', apollo_feature, max_outputs=8)
 
             tf.summary.scalar('TrainLoss', loss)
@@ -140,7 +140,7 @@ class TrainProcessor(object):
                     iter, self.args.epoch_iters * self.epoch, blobs['serial_num'], timer.average_time, loss_)
                     print 'Loading pcd use: {:.3}s, and generating voxel points use: {:.3}s'.format(
                         blobs['voxel_gen_time'][0], blobs['voxel_gen_time'][1])
-                if iter % 20 == 0 and cfg.TRAIN.TENSORBOARD:
+                if iter % 10 == 0 and cfg.TRAIN.TENSORBOARD:
                     train_writer.add_summary(merged_, iter)
                     # train_writer.add_run_metadata(run_metadata, 'step%03d' % iter,iter)
                     pass
@@ -180,17 +180,33 @@ class TrainProcessor(object):
                             self.net.apollo_8feature: blobs['apollo_8feature'],
 
                         }
-                        valid_sum_,loss_valid_ = sess.run([valid_image_summary,loss], feed_dict=feed_dict_)
+                        valid_sum_, loss_valid_ = sess.run([valid_image_summary,loss], feed_dict=feed_dict_)
                         # train_writer.add_summary(valid, data_idx)
-
                         valid_loss_total += loss_valid_
-                        if cfg.TRAIN.VISUAL_VALID and data_idx % 20 == 0:
-                            pass
-                            print 'Valid step: {:d}/{:d} , theta_loss = {:.3f}'.format(data_idx + 1, self.val_epoch, float(loss_valid_))
-
                         if data_idx % 10 == 0 and cfg.TRAIN.TENSORBOARD:
                             pass
                             train_writer.add_summary(valid_sum_, data_idx)
+
+                        # one_hist = self.get_hist(dense_prediction, label)
+                        # print('    class # 0 precision = {:f}  recall = {:f}'.format(
+                        #     (one_hist[0, 0] / (one_hist[0, 0] + one_hist[1, 0])),
+                        #     (one_hist[0, 0] / (one_hist[0, 0] + one_hist[0, 1]))))
+                        # print('    class # 1 precision = {:f}  recall = {:f}'.format(
+                        #     (one_hist[1, 1] / (one_hist[1, 1] + one_hist[0, 1])),
+                        #     (one_hist[1, 1] / (one_hist[1, 1] + one_hist[1, 0]))))
+                        # if not math.isnan(one_hist[1, 1] / (one_hist[1, 1] + one_hist[0, 1])):
+                        #     if not math.isnan(one_hist[1, 1] / (one_hist[1, 1] + one_hist[1, 0])):
+                        #         hist += one_hist
+                        #
+                        # if cfg.TRAIN.VISUAL_VALID and data_idx % 20 == 0:
+                        #     pass
+                        #     print 'Valid step: {:d}/{:d} , theta_loss = {:.3f}'\
+                        #         .format(data_idx + 1, self.val_epoch, float(loss_valid_))
+
+                # acc_total = np.diag(hist).sum() / hist.sum()
+                # iu = np.diag(hist) / (hist.sum(1) + hist.sum(0) - np.diag(hist))
+                # print('acc: %f \n' % acc_total)
+                # print('mean IU:  %f\n' % (np.nanmean(iu)))
 
                 valid_summary = tf.summary.merge([epoch_valid_loss_sum_op])
                 valid_res = sess.run(valid_summary,feed_dict={epoch_valid_loss: float(valid_loss_total) / self.val_epoch})
@@ -211,7 +227,7 @@ class TestProcessor(object):
 
     def save_res_as_pcd(self,pointcloud,map,save_path,folder,idx_):
         import numpy as np
-        from tools.utils import bound_trans_lidar2bv
+        from tools.utils import trans_lidar2bv
         from tools.py_pcd import point_cloud
 
         map = map.reshape(cfg.CUBIC_SIZE[0], cfg.CUBIC_SIZE[1])
@@ -221,7 +237,7 @@ class TestProcessor(object):
         pointcloud[:,3]=np.zeros([pointcloud.shape[0]],dtype=np.float32)
 
         center = np.array([cfg.DETECTION_RANGE, cfg.DETECTION_RANGE, 0], dtype=np.float32)
-        shifted_coord = bound_trans_lidar2bv(pointcloud[:, 0:3], center)
+        shifted_coord = trans_lidar2bv(pointcloud[:, 0:3], center)
         voxel_size = np.array(cfg.CUBIC_RES, dtype=np.float32)
         voxel_index = np.floor(shifted_coord[:, 0:2] / voxel_size).astype(np.int)
 
@@ -264,15 +280,18 @@ class TestProcessor(object):
             updates = tf.ones([cnt], dtype=tf.float32)
             input_map = tf.reshape(tf.scatter_nd(self.net.coordinate, updates, shape=[640, 640]), (-1, 640, 640, 1))
 
+            apollo_feature = tf.transpose(self.net.apollo_8feature, perm=[3, 1, 2, 0])
+            tf.summary.image('ApolloFeature', apollo_feature, max_outputs=8)
+
             tf.summary.image('Input_Data', input_map)
             tf.summary.image('Pred-Map', res_map)
 
             merged = tf.summary.merge_all()  # hxd: before the next summary ops
 
         sess.run(tf.global_variables_initializer())
-        if self.args.fine_tune:
-            print 'Loading pre-trained model weights from {:s}'.format(self.args.weights)
-            self.net.load_weigths(self.args.weights, sess, self.saver)
+
+        print 'Loading pre-trained model weights from {:s}'.format(self.args.weights)
+        self.net.load_weigths(self.args.weights, sess, self.saver)
 
         timer = Timer()
         training_series = range(self.epoch)
@@ -296,7 +315,7 @@ class TestProcessor(object):
             if data_idx % cfg.TEST.ITER_DISPLAY == 0:
                 print 'Iter: %d/%d, Serial_num: %s, Speed: %.3fs/iter' % (data_idx, self.epoch, blobs['serial_num'], timer.average_time)
                 print 'Loading pcd use: {:.3}s, and generating voxel points use: {:.3}s'.format(blobs['voxel_gen_time'][0], blobs['voxel_gen_time'][1])
-            if data_idx % 1 == 0 and cfg.TRAIN.TENSORBOARD:
+            if data_idx % 1 == 0 and cfg.TEST.TENSORBOARD:
                 train_writer.add_summary(merged_, data_idx)
                 pass
             if (data_idx+1) % 200 == 0 and cfg.TEST.DEBUG_TIMELINE:

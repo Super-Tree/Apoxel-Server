@@ -2,6 +2,15 @@ import numpy as np
 import tensorflow as tf
 from network.config import cfg
 
+
+def get_hist(self, predictions, labels):
+    num_class = predictions.shape[3]
+    batch_size = predictions.shape[0]
+    hist = np.zeros((num_class, num_class))
+    for i in range(batch_size):
+        hist += self.fast_hist(labels[i].flatten(), predictions[i].argmax(2).flatten(), num_class)
+    return hist
+
 def fast_hist(labels, pred, num_class=2):
     k = (labels >= 0) & (labels < num_class)
     res = np.bincount(num_class * labels[k].astype(int) + pred[k], minlength=num_class**2).reshape(num_class, num_class)
@@ -31,8 +40,7 @@ def bounding_filter(points,box=(0,0)):
 
     return filter_points
 
-def bound_trans_lidar2bv(points, center):
-    points = bounding_filter(points)
+def trans_lidar2bv(points, center):
     points = (points-center)*np.array([-1,-1,1])
     points = points[:,(0,1,2)]#TODO:be careful
 
