@@ -1,12 +1,13 @@
 import random
 import os
+import math
 import numpy as np
 import tensorflow as tf
 from tools.timer import Timer
 from network.config import cfg
 from tensorflow.python.client import timeline
 from tools.data_visualize import pcd_vispy, vispy_init
-
+from tools.utils import get_hist,fast_hist
 DEBUG = False
 SUFFIX ='M5-E6_test_gaojiaqiao_pointcnt_50'
 
@@ -20,12 +21,12 @@ class TrainProcessor(object):
         self.epoch = self.dataset.training_rois_length
         self.val_epoch = self.dataset.validing_rois_length
 
-    def snapshot(self, sess,iter=None):
+    def snapshot(self, sess, iter_=None):
         output_dir = os.path.join(cfg.ROOT_DIR, 'output', self.random_folder)
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
 
-        filename = os.path.join(output_dir, 'Apoxel_Epoch_{:d}'.format(iter) + '.ckpt')
+        filename = os.path.join(output_dir, 'Apoxel_Epoch_{:d}'.format(iter_) + '.ckpt')
         self.saver.save(sess, filename)
         print 'Wrote snapshot to: {:s}'.format(filename)
 
@@ -100,7 +101,11 @@ class TrainProcessor(object):
 
         with tf.name_scope('TrainingMonitor'):
             epoch_valid_loss = tf.placeholder(dtype=tf.float32)
-            epoch_valid_loss_sum_op = tf.summary.scalar('epoch_los', epoch_valid_loss)
+            epoch_valid_loss_sum_op = tf.summary.scalar('epoch_loss', epoch_valid_loss)
+            epoch_valid_ac = tf.placeholder(dtype=tf.float32)
+            epoch_valid_ac_sum_op = tf.summary.scalar('epoch_accurate', epoch_valid_ac)
+            epoch_valid_rc = tf.placeholder(dtype=tf.float32)
+            epoch_valid_rc_sum_op = tf.summary.scalar('epoch_recall', epoch_valid_rc)
 
         sess.run(tf.global_variables_initializer())
         if self.args.fine_tune:
@@ -131,10 +136,8 @@ class TrainProcessor(object):
                 run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
                 run_metadata = tf.RunMetadata()
                 timer.tic()
-                res_map_, loss_, merged_, _ = sess.run([res_map, loss, main_merged, train_op], feed_dict=feed_dict,
-                                                       options=run_options, run_metadata=run_metadata)
+                res_map_, loss_, merged_, _ = sess.run([res_map, loss, main_merged, train_op], feed_dict=feed_dict,options=run_options, run_metadata=run_metadata)
                 timer.toc()
-
                 if iter % cfg.TRAIN.ITER_DISPLAY == 0:
                     print 'Iter: %d/%d, Serial_num: %s, Speed: %.3fs/iter, Loss: %.3f ' % (
                     iter, self.args.epoch_iters * self.epoch, blobs['serial_num'], timer.average_time, loss_)
@@ -169,6 +172,7 @@ class TrainProcessor(object):
 
                     print 'Valid the net at the end of epoch_{} ...'.format(epo_cnt + 1)
                     valid_loss_total = 0.0
+                    hist = np.zeros((cfg.NUM_CLASS, cfg.NUM_CLASS))
                     for data_idx in range(self.val_epoch):  # self.val_epoch
                         blobs = self.dataset.get_minibatch(data_idx, 'valid')
                         feed_dict_ = {
@@ -178,38 +182,29 @@ class TrainProcessor(object):
                             self.net.number: blobs['ptsnum_stack'],
                             self.net.gt_map: blobs['object_labels'],
                             self.net.apollo_8feature: blobs['apollo_8feature'],
-
                         }
-                        valid_sum_, loss_valid_ = sess.run([valid_image_summary,loss], feed_dict=feed_dict_)
+                        res_map_, valid_sum_, loss_valid_ = sess.run([res_map,valid_image_summary,loss], feed_dict=feed_dict_)
                         # train_writer.add_summary(valid, data_idx)
                         valid_loss_total += loss_valid_
+                        one_hist = get_hist(blobs['object_labels'], res_map_)  # [[TN,FP],[FN,TP]]
+                        hist += one_hist
                         if data_idx % 10 == 0 and cfg.TRAIN.TENSORBOARD:
                             pass
                             train_writer.add_summary(valid_sum_, data_idx)
 
-                        # one_hist = self.get_hist(dense_prediction, label)
-                        # print('    class # 0 precision = {:f}  recall = {:f}'.format(
-                        #     (one_hist[0, 0] / (one_hist[0, 0] + one_hist[1, 0])),
-                        #     (one_hist[0, 0] / (one_hist[0, 0] + one_hist[0, 1]))))
-                        # print('    class # 1 precision = {:f}  recall = {:f}'.format(
-                        #     (one_hist[1, 1] / (one_hist[1, 1] + one_hist[0, 1])),
-                        #     (one_hist[1, 1] / (one_hist[1, 1] + one_hist[1, 0]))))
-                        # if not math.isnan(one_hist[1, 1] / (one_hist[1, 1] + one_hist[0, 1])):
-                        #     if not math.isnan(one_hist[1, 1] / (one_hist[1, 1] + one_hist[1, 0])):
-                        #         hist += one_hist
-                        #
-                        # if cfg.TRAIN.VISUAL_VALID and data_idx % 20 == 0:
-                        #     pass
-                        #     print 'Valid step: {:d}/{:d} , theta_loss = {:.3f}'\
-                        #         .format(data_idx + 1, self.val_epoch, float(loss_valid_))
+                        if cfg.TRAIN.VISUAL_VALID and data_idx % 20 == 0:
+                            print 'Valid step: {:d}/{:d} , theta_loss = {:.3f}'.format(data_idx + 1, self.val_epoch, float(loss_valid_))
+                            print('Object precision = {:.4f}  recall = {:.4f}'.format(
+                                (one_hist[1, 1] / (one_hist[1, 1] + one_hist[0, 1] + 1e-5)),
+                                (one_hist[1, 1] / (one_hist[1, 1] + one_hist[1, 0] + 1e-5))))
 
-                # acc_total = np.diag(hist).sum() / hist.sum()
-                # iu = np.diag(hist) / (hist.sum(1) + hist.sum(0) - np.diag(hist))
-                # print('acc: %f \n' % acc_total)
-                # print('mean IU:  %f\n' % (np.nanmean(iu)))
+                object_valid_ac = (hist[1, 1] / (hist[1, 1] + hist[0, 1] + 1e-5))
+                object_valid_rc = (hist[1, 1] / (hist[1, 1] + hist[1, 0] + 1e-5))
 
-                valid_summary = tf.summary.merge([epoch_valid_loss_sum_op])
-                valid_res = sess.run(valid_summary,feed_dict={epoch_valid_loss: float(valid_loss_total) / self.val_epoch})
+                valid_summary = tf.summary.merge([epoch_valid_loss_sum_op, epoch_valid_ac_sum_op,epoch_valid_rc_sum_op])
+                valid_res = sess.run(valid_summary, feed_dict={epoch_valid_loss: float(valid_loss_total) / self.val_epoch,
+                                                               epoch_valid_ac: object_valid_ac,
+                                                               epoch_valid_rc: object_valid_rc})
                 train_writer.add_summary(valid_res, epo_cnt + 1)
                 print 'Validation of epoch_{}:theta_loss_total = {:.3f}\n'.format(epo_cnt + 1, float(valid_loss_total) / self.val_epoch)
             random.shuffle(training_series)  # shuffle the training series
