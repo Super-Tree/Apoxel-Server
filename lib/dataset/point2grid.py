@@ -4,7 +4,7 @@ from network.config import cfg
 
 
 def voxel_grid(point_cloud,cfg,thread_sum=4):
-    from tools.utils import bound_trans_lidar2bv
+    from tools.utils import trans_lidar2bv,bounding_filter
 
     # Input:
     #   (N, 3):only x,y,z
@@ -12,19 +12,21 @@ def voxel_grid(point_cloud,cfg,thread_sum=4):
     #   voxel_dict
     from tools.data_visualize import pcd_vispy
 
-    keep = np.where(np.isfinite(point_cloud[:,0]))[0]
-    point_cloud=point_cloud[keep,0:3]
+    keep = np.where(np.isfinite(point_cloud[:, 0]))[0]
+    point_cloud = point_cloud[keep, 0:3]
     max_point_number = cfg.VOXEL_POINT_COUNT
     # pcd_vispy(point_cloud)
-    center = np.array([cfg.DETECTION_RANGE, cfg.DETECTION_RANGE,0],dtype=np.float32)
-    shifted_coord = bound_trans_lidar2bv(point_cloud, center)
-    np.random.shuffle(shifted_coord)
+    center = np.array([cfg.DETECTION_RANGE, cfg.DETECTION_RANGE,0], dtype=np.float32)
+    bounding_point_cloud = bounding_filter(point_cloud)
+    np.random.shuffle(bounding_point_cloud)
+    shifted_coord = trans_lidar2bv(bounding_point_cloud, center)
+
     # pcd_vispy(shifted_coord)
 
     voxel_size = np.array(cfg.CUBIC_RES, dtype=np.float32)
     voxel_index = np.floor(shifted_coord[:,0:2]/ voxel_size).astype(np.int)
 
-    # [K, 3] coordinate buffer as described in the paper
+    # [K, 2] coordinate buffer as described in the paper
     coordinate_buffer = np.unique(voxel_index, axis=0)
 
     K = len(coordinate_buffer)
@@ -41,7 +43,7 @@ def voxel_grid(point_cloud,cfg,thread_sum=4):
     for i in range(K):
         index_buffer[tuple(coordinate_buffer[i])] = i
 
-    for voxel, point in zip(voxel_index, shifted_coord):
+    for voxel, point in zip(voxel_index, bounding_point_cloud):
         index = index_buffer[tuple(voxel)]
         number = number_buffer[index]
         if number < T:
@@ -64,5 +66,5 @@ if __name__ == '__main__':
     data = dataset.check_name_get_data(name)
     points = data['lidar3d_data']
 
-    grid = voxel_grid(points,cfg)
+    grid = voxel_grid(points, cfg)
     pass
