@@ -14,23 +14,20 @@ def voxel_grid(point_cloud,cfg,thread_sum=4):
 
     keep = np.where(np.isfinite(point_cloud[:, 0]))[0]
     point_cloud = point_cloud[keep, 0:3]
-    max_point_number = cfg.VOXEL_POINT_COUNT
-    # pcd_vispy(point_cloud)
+
     center = np.array([cfg.DETECTION_RANGE, cfg.DETECTION_RANGE,0], dtype=np.float32)
     bounding_point_cloud = bounding_filter(point_cloud)
     np.random.shuffle(bounding_point_cloud)
     shifted_coord = trans_lidar2bv(bounding_point_cloud, center)
 
-    # pcd_vispy(shifted_coord)
-
     voxel_size = np.array(cfg.CUBIC_RES, dtype=np.float32)
-    voxel_index = np.floor(shifted_coord[:,0:2]/ voxel_size).astype(np.int)
+    voxel_index = np.floor(shifted_coord[:,0:2]/voxel_size).astype(np.int)
 
     # [K, 2] coordinate buffer as described in the paper
     coordinate_buffer = np.unique(voxel_index, axis=0)
 
     K = len(coordinate_buffer)
-    T = max_point_number
+    T = cfg.VOXEL_POINT_COUNT
 
     # [K, 1] store number of points in each voxel grid
     number_buffer = np.zeros(shape=(K), dtype=np.int64)

@@ -17,7 +17,7 @@ __C.LOG_DIR = osp.abspath(osp.join(__C.ROOT_DIR, 'log'))
 __C.TEST_RESULT = osp.abspath(osp.join(__C.ROOT_DIR, 'test_result'))
 
 __C.CPU_CNT = cpu_count()
-
+__C.NUM_CLASS = 2
 __C.VOXEL_POINT_COUNT = 50
 __C.DETECTION_RANGE = 60.0
 __C.Z_AXIS_MIN = -4.0
@@ -29,8 +29,8 @@ __C.CUBIC_SIZE = [int(np.ceil(np.round(__C.ANCHOR[i] / __C.CUBIC_RES[i], 3))) fo
 __C.TRAIN = edict()
 
 __C.TRAIN.LEARNING_RATE = 1e-4
-
 __C.TRAIN.ITER_DISPLAY = 10
+
 __C.TRAIN.TENSORBOARD = True
 __C.TRAIN.DEBUG_TIMELINE = True
 __C.TRAIN.EPOCH_MODEL_SAVE = True
